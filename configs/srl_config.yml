@@ -10,10 +10,10 @@ data:
 # Training parameters
 train:
     num_train_epochs: 3
-    eval_strategy: epoch
+    eval_strategy: steps
     save_strategy: epoch
     logging_steps: 50
     save_total_limit: 2
 
 # Directory to save model configs, checkpoints, and final model
-model_outdir: ./models/srl/
+model_outdir: ./models/srl/default

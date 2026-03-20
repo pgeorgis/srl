@@ -1,21 +1,25 @@
 import argparse
+import json
 import logging
 import os
 
 import yaml
 from datasets import Dataset
+from seqeval.metrics import (accuracy_score, f1_score, precision_score,
+                             recall_score)
 from transformers import (AutoModelForTokenClassification, AutoTokenizer,
                           Trainer, TrainingArguments)
 
-from constants import (END_PREDICATE_TOKEN, SRL_BASE_MODEL, SRL_MODEL_DIR,
+from constants import (DEFAULT_SRL_MODEL_DIR, END_PREDICATE_TOKEN,
+                       SRL_BASE_MODEL, SRL_MODEL_DATA_DIR,
                        START_PREDICATE_TOKEN)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
-DEFAULT_TRAIN_DATA = os.path.join(SRL_MODEL_DIR, "data", "de_gsd-ud-up-train.conllup")
-DEFAULT_VALIDATION_DATA = os.path.join(SRL_MODEL_DIR, "data", "de_gsd-ud-up-dev.conllup")
-DEFAULT_TEST_DATA = os.path.join(SRL_MODEL_DIR, "data", "de_gsd-ud-up-test.conllup")
+DEFAULT_TRAIN_DATA = os.path.join(SRL_MODEL_DATA_DIR, "de_gsd-ud-up-train.conllup")
+DEFAULT_VALIDATION_DATA = os.path.join(SRL_MODEL_DATA_DIR, "de_gsd-ud-up-dev.conllup")
+DEFAULT_TEST_DATA = os.path.join(SRL_MODEL_DATA_DIR, "de_gsd-ud-up-test.conllup")
 
 
 class SemanticRoleDataset:
@@ -25,6 +29,7 @@ class SemanticRoleDataset:
         self.labels = self.get_labels()
 
     def load_data(self) -> list:
+        logger.info(f"Loading data from {self.filepath}")
         sentences = self.read_conllup(self.filepath)
         examples = self.extract_predicate_examples(sentences)
         return examples
@@ -135,7 +140,7 @@ class SemanticRoleLabeler:
                  train_conllup: str,
                  validation_conllup: str,
                  test_conllup: str,
-                 model_outdir: str = SRL_MODEL_DIR,
+                 model_outdir: str = DEFAULT_SRL_MODEL_DIR,
                  base_model: str = SRL_BASE_MODEL,
                  ):
         # Set model output directory
@@ -143,19 +148,23 @@ class SemanticRoleLabeler:
 
         # Initialize base model and tokenizer
         self.base_model_name = base_model
+        logger.info("Initializing tokenizer...")
         self.tokenizer = self.init_tokenizer()
         self.labels = set()
 
         # Initialize semantic role datasets from input .conllup files
         # NB: Label set is built during this step, thus should not tokenize until after
+        logger.info("Initializing input data...")
         train_set  = self.init_input_data(train_conllup)
         validation_set = self.init_input_data(validation_conllup)
         test_set = self.init_input_data(test_conllup)
 
-        # Extract semantic role label <-> ID mappings 
+        # Extract semantic role label <-> ID mappings
+        logger.info(f"Semantic label set: {sorted(self.labels)}")
         self.label2id, self.id2label = self.get_label_maps()
 
         # Preprocess SemanticRoleDatasets: tokenization and alignment
+        logger.info("Tokenizing data...")
         self.train_set = self.preprocess_dataset(train_set)
         self.validation_set = self.preprocess_dataset(validation_set)
         self.test_set = self.preprocess_dataset(test_set)
@@ -218,6 +227,7 @@ class SemanticRoleLabeler:
         return label2id, id2label
     
     def init_base_model(self):
+        logger.info(f"Loading base model <{self.base_model_name}> ...")
         model = AutoModelForTokenClassification.from_pretrained(
             self.base_model_name,
             num_labels=len(self.labels),
@@ -239,14 +249,49 @@ class SemanticRoleLabeler:
             args=training_args,
             train_dataset=self.train_set,
             eval_dataset=self.validation_set,
+            compute_metrics=self.compute_metrics,
         )
         trainer.train()
         logger.info("Model training complete.")
+
+        # Final evaluation on test set
+        test_metrics = trainer.evaluate(self.test_set, metric_key_prefix="test")
+        self.log_metrics(test_metrics, outdir=outdir)
+        logger.info(f"Test metrics: {test_metrics}")
 
         # Save trained model
         trainer.save_model(outdir)
         self.tokenizer.save_pretrained(outdir)
         logger.info(f"Model saved to {outdir}")
+
+    def compute_metrics(self, eval_pred) -> dict[str, float]:
+        predictions, labels = eval_pred
+        preds = predictions.argmax(axis=-1)
+
+        true_labels = []
+        true_preds = []
+        for pred_seq, label_seq in zip(preds, labels):
+            seq_labels = []
+            seq_preds = []
+            for pred_id, label_id in zip(pred_seq, label_seq):
+                if label_id == -100:
+                    continue
+                seq_labels.append(self.id2label[label_id])
+                seq_preds.append(self.id2label[pred_id])
+            true_labels.append(seq_labels)
+            true_preds.append(seq_preds)
+
+        return {
+            "accuracy": accuracy_score(true_labels, true_preds),
+            "precision": precision_score(true_labels, true_preds),
+            "recall": recall_score(true_labels, true_preds),
+            "f1": f1_score(true_labels, true_preds),
+        }
+
+    def log_metrics(self, metrics: dict, outdir: str):
+        logfile = os.path.join(outdir, "test_metrics.json")
+        with open(logfile, "w") as f:
+            json.dump(metrics, f, indent=4)
 
 
 def load_config(config_path: str) -> dict:
@@ -259,14 +304,21 @@ def load_config(config_path: str) -> dict:
 def main(config_path: str):
     # Load run config
     config = load_config(config_path=config_path)
+    logger.info(f'Loaded model config from {config_path}')
 
     # Extract required arguments from run config or use defaults
-    model_outdir = config.get("model_outdir", SRL_MODEL_DIR)
+    model_outdir = config.get("model_outdir", DEFAULT_SRL_MODEL_DIR)
     base_model_name = config.get("base_model", SRL_BASE_MODEL)
+    logger.info(f"Base model: {base_model_name}")
     train_datafile = config.get("data", {}).get("train", DEFAULT_TRAIN_DATA)
     validation_datafile = config.get("data", {}).get("validation", DEFAULT_VALIDATION_DATA)
     test_datafile = config.get("data", {}).get("test", DEFAULT_TEST_DATA)
+    logger.info(f"Training data: {train_datafile}")
+    logger.info(f"Validation data: {validation_datafile}")
+    logger.info(f"Test data: {test_datafile}")
     training_parameters = config.get("train", {})
+    if training_parameters:
+        logger.info(f"Loaded training parameters: {json.dumps(training_parameters, indent=4)}")
 
     # Initialize model with train/validation/test data
     srl_model = SemanticRoleLabeler(
