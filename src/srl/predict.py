@@ -1,32 +1,22 @@
+import argparse
+
 import spacy
 import torch
 from transformers import AutoModelForTokenClassification, AutoTokenizer
 
-from constants import DEFAULT_SPACY_MODEL
+from constants import (DEFAULT_SPACY_MODEL, END_PREDICATE_TOKEN, SRL_MODEL_DIR,
+                       START_PREDICATE_TOKEN, VERB_TAGS)
 
-########################################
-# CONFIG
-########################################
-MODEL_PATH = "./models/srl"
 
-########################################
-# LOAD MODELS
-########################################
+def load_pretrained_srl_model(model_dir: str) -> tuple:
+    model = AutoModelForTokenClassification.from_pretrained(model_dir)
+    tokenizer = AutoTokenizer.from_pretrained(model_dir)
+    return model, tokenizer
 
-nlp = spacy.load(DEFAULT_SPACY_MODEL)
-
-tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
-model = AutoModelForTokenClassification.from_pretrained(MODEL_PATH)
-
-model.eval()
-
-########################################
-# HELPER FUNCTIONS
-########################################
 
 def get_predicate_indices(doc):
     """Return indices of verbs/auxiliaries"""
-    return [i for i, tok in enumerate(doc) if tok.pos_ in {"VERB", "AUX"}]
+    return [i for i, tok in enumerate(doc) if tok.pos_ in VERB_TAGS]
 
 
 def mark_predicate(tokens, pred_index):
@@ -34,20 +24,20 @@ def mark_predicate(tokens, pred_index):
     marked = []
     for i, tok in enumerate(tokens):
         if i == pred_index:
-            marked.extend(["[PRED]", tok, "[/PRED]"])
+            marked.extend([START_PREDICATE_TOKEN, tok, END_PREDICATE_TOKEN])
         else:
             marked.append(tok)
     return marked
 
 
-def predict(tokens, pred_index):
+def predict_srl(tokens: list,
+                pred_index: int,
+                model,
+                tokenizer,
+                ):
     """Run SRL for one predicate"""
-    
+    model.eval()  # switch model to evaluation mode
     marked_tokens = mark_predicate(tokens, pred_index)
-
-    # DEBUG (optional)
-    # print("INPUT:", " ".join(marked_tokens))
-
     encoding = tokenizer(
         marked_tokens,
         is_split_into_words=True,
@@ -75,7 +65,7 @@ def predict(tokens, pred_index):
         label = model.config.id2label[preds[i].item()]
 
         # skip special tokens
-        if token in ["[PRED]", "[/PRED]"]:
+        if token in [START_PREDICATE_TOKEN, END_PREDICATE_TOKEN]:
             continue
 
         results.append((token, label))
@@ -83,28 +73,34 @@ def predict(tokens, pred_index):
     return results
 
 
-def pretty_print(predicate, prediction):
+def pretty_print_srl(predicate, srl_prediction):
     """Nicely print SRL output"""
     print(f"\n=== Predicate: {predicate} ===")
-    for tok, label in prediction:
+    for tok, label in srl_prediction:
         print(f"{tok:20} {label}")
 
 
-########################################
-# MAIN TEST
-########################################
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser("Loads a pretrained semantic role labeling model and performs prediction on a given text.")
+    parser.add_argument('--text', help='Input text to label with semantic roles')
+    parser.add_argument('--srl_model', default=SRL_MODEL_DIR, help='Path to pretrained semantic role labeling model')
+    parser.add_argument('--spacy_model', default=DEFAULT_SPACY_MODEL, help='Name of spaCy model for preprocessing text (NB: must have been pre-downloaded)')
+    args = parser.parse_args()
 
-test_sentence = """Ich denke, dass Sophie das Buch schon gelesen hat, das von ihrem Bruder veröffentlicht wurde."""
+    # Load models
+    nlp_preproc = spacy.load(args.spacy_model)
+    model, tokenizer = load_pretrained_srl_model(args.srl_model)
 
-doc = nlp(test_sentence)
-tokens = [tk.text for tk in doc]
+    # Preprocess text into syntactically/morphologically tagged tokens with spaCy pipeline
+    print(f"Text: {args.text}")
+    doc = nlp_preproc(args.text)
+    tokens = [tk.text for tk in doc]
 
-pred_indices = get_predicate_indices(doc)
+    # Get indices of predicates in text
+    pred_indices = get_predicate_indices(doc)
 
-print("Sentence:")
-print(test_sentence)
-
-for pred_idx in pred_indices:
-    predicate = tokens[pred_idx]
-    prediction = predict(tokens, pred_idx)
-    pretty_print(predicate, prediction)
+    # Perform SRL prediction for each predicate and pretty-print results
+    for pred_idx in pred_indices:
+        predicate = tokens[pred_idx]
+        prediction = predict_srl(tokens, pred_idx, model, tokenizer)
+        pretty_print_srl(predicate, prediction)
