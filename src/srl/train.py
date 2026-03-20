@@ -5,6 +5,7 @@ import logging
 import os
 import warnings
 
+import matplotlib.pyplot as plt
 import yaml
 from datasets import Dataset
 from seqeval.metrics import (accuracy_score, f1_score, precision_score,
@@ -300,6 +301,9 @@ class SemanticRoleLabeler:
             self.log_metrics(test_metrics, outdir=outdir)
             logger.info(f"Test metrics: {test_metrics}")
 
+            # Plot training curves (loss + accuracy)
+            self.plot_training_curves(trainer.state.log_history, outdir=outdir)
+
         # Save trained model
         trainer.save_model(outdir)
         self.tokenizer.save_pretrained(outdir)
@@ -333,6 +337,72 @@ class SemanticRoleLabeler:
         logfile = os.path.join(outdir, "test_metrics.json")
         with open(logfile, "w") as f:
             json.dump(metrics, f, indent=4)
+
+    def plot_training_curves(self, log_history: list[dict], outdir: str):
+        train_loss = []
+        train_x = []
+        val_loss = []
+        val_x = []
+        val_acc = []
+        val_acc_x = []
+        train_acc = []
+        train_acc_x = []
+
+        for entry in log_history:
+            if "epoch" in entry:
+                x_val = entry["epoch"]
+            elif "step" in entry:
+                x_val = entry["step"]
+            else:
+                continue
+
+            if "loss" in entry and "eval_loss" not in entry:
+                train_loss.append(entry["loss"])
+                train_x.append(x_val)
+
+            if "eval_loss" in entry:
+                val_loss.append(entry["eval_loss"])
+                val_x.append(x_val)
+
+            if "eval_accuracy" in entry:
+                val_acc.append(entry["eval_accuracy"])
+                val_acc_x.append(x_val)
+
+            if "accuracy" in entry and "eval_accuracy" not in entry:
+                train_acc.append(entry["accuracy"])
+                train_acc_x.append(x_val)
+
+        if not train_loss and not val_loss and not val_acc and not train_acc:
+            logger.info("No training metrics found to plot.")
+            return
+
+        fig, axes = plt.subplots(2, 1, figsize=(9, 8), sharex=True)
+
+        # Loss plot
+        if train_loss:
+            axes[0].plot(train_x, train_loss, label="train loss")
+        if val_loss:
+            axes[0].plot(val_x, val_loss, label="val loss")
+        axes[0].set_title("Loss")
+        axes[0].set_ylabel("loss")
+        axes[0].legend()
+
+        # Accuracy plot
+        if train_acc:
+            axes[1].plot(train_acc_x, train_acc, label="train accuracy")
+        if val_acc:
+            axes[1].plot(val_acc_x, val_acc, label="val accuracy")
+        axes[1].set_title("Accuracy")
+        axes[1].set_ylabel("accuracy")
+        axes[1].set_xlabel("epoch")
+        if train_acc or val_acc:
+            axes[1].legend()
+
+        fig.tight_layout()
+        output_path = os.path.join(outdir, "training_curves.png")
+        fig.savefig(output_path, dpi=150)
+        plt.close(fig)
+        logger.info(f"Plotted training curves to {output_path}")
 
 
 def load_config(config_path: str) -> dict:
