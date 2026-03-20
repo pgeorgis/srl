@@ -1,5 +1,6 @@
 from transformers import AutoTokenizer, AutoModelForTokenClassification, TrainingArguments, Trainer
 from datasets import Dataset
+from constants import START_PREDICATE_TOKEN, END_PREDICATE_TOKEN
 
 train_datafile = '/Users/pgeorgis/Documents/tools/Universal Dependencies 2.9/ud_up_test/de_gsd-ud-up-train.conllup'
 dev_datafile = '/Users/pgeorgis/Documents/tools/Universal Dependencies 2.9/ud_up_test/de_gsd-ud-up-dev.conllup'
@@ -88,13 +89,13 @@ def extract_examples(sentences):
 
                 for idx, token in enumerate(tokens):
                     if idx == predicate_index:
-                        marked_tokens.append("[PRED]")
+                        marked_tokens.append(START_PREDICATE_TOKEN)
                         marked_labels.append("O")
 
                         marked_tokens.append(token)
                         marked_labels.append(labels[idx])
 
-                        marked_tokens.append("[/PRED]")
+                        marked_tokens.append(END_PREDICATE_TOKEN)
                         marked_labels.append("O")
                     else:
                         marked_tokens.append(token)
@@ -171,7 +172,7 @@ print("Labels:", label_list)
 ########################################
 
 tokenizer = AutoTokenizer.from_pretrained("xlm-roberta-base")
-special_tokens = {"additional_special_tokens": ["[PRED]", "[/PRED]"]}
+special_tokens = {"additional_special_tokens": [START_PREDICATE_TOKEN, END_PREDICATE_TOKEN]}
 tokenizer.add_special_tokens(special_tokens)
 
 train_dataset = Dataset.from_list(train_examples)
