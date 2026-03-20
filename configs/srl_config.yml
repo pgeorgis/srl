@@ -1,0 +1,19 @@
+# Base embeddings transformer model to fine-tune
+base_model: xlm-roberta-base
+
+# Paths to data to train and test model
+data:
+    train: ./models/srl/data/de_gsd-ud-up-train.conllup
+    validation: ./models/srl/data/de_gsd-ud-up-dev.conllup
+    test: ./models/srl/data/de_gsd-ud-up-test.conllup
+
+# Training parameters
+train:
+    num_train_epochs: 3
+    eval_strategy: epoch
+    save_strategy: epoch
+    logging_steps: 50
+    save_total_limit: 2
+
+# Directory to save model configs, checkpoints, and final model
+model_outdir: ./models/srl/

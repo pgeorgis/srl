@@ -1,247 +1,288 @@
+import argparse
+import logging
 import os
 
+import yaml
 from datasets import Dataset
 from transformers import (AutoModelForTokenClassification, AutoTokenizer,
                           Trainer, TrainingArguments)
 
-from constants import END_PREDICATE_TOKEN, START_PREDICATE_TOKEN
+from constants import (END_PREDICATE_TOKEN, SRL_BASE_MODEL, SRL_MODEL_DIR,
+                       START_PREDICATE_TOKEN)
 
-model_outdir = os.path.abspath("./models/srl")
-train_datafile = os.path.join(model_outdir, "data", "de_gsd-ud-up-train.conllup")
-dev_datafile = os.path.join(model_outdir, "data", "de_gsd-ud-up-dev.conllup")
-test_datafile = os.path.join(model_outdir, "data", "de_gsd-ud-up-test.conllup")
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(levelname)s: %(message)s')
+logger = logging.getLogger(__name__)
 
-########################################
-# 1. Parse CONLLUP
-########################################
-
-def read_conllup(path):
-    sentences = []
-    current = []
-
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-
-            if not line:
-                if current:
-                    sentences.append(current)
-                    current = []
-                continue
-
-            if line.startswith("#"):
-                continue
-
-            cols = line.split("\t")
-
-            # skip multiword tokens like "6-7 im"
-            if "-" in cols[0]:
-                continue
-
-            token = cols[1]
-            pred = cols[8]
-            argspans = cols[10]
-
-            current.append({
-                "token": token,
-                "pred": pred,
-                "argspans": argspans
-            })
-
-    return sentences
+DEFAULT_TRAIN_DATA = os.path.join(SRL_MODEL_DIR, "data", "de_gsd-ud-up-train.conllup")
+DEFAULT_VALIDATION_DATA = os.path.join(SRL_MODEL_DIR, "data", "de_gsd-ud-up-dev.conllup")
+DEFAULT_TEST_DATA = os.path.join(SRL_MODEL_DIR, "data", "de_gsd-ud-up-test.conllup")
 
 
-########################################
-# 2. Convert to SRL examples
-########################################
+class SemanticRoleDataset:
+    def __init__(self, data_filepath: str):
+        self.filepath = os.path.abspath(data_filepath)
+        self.examples = self.load_data()
+        self.labels = self.get_labels()
 
-def extract_examples(sentences):
-    examples = []
+    def load_data(self) -> list:
+        sentences = self.read_conllup(self.filepath)
+        examples = self.extract_predicate_examples(sentences)
+        return examples
 
-    for sent in sentences:
-        tokens = [w["token"] for w in sent]
+    def get_labels(self) -> set:
+        label_set = set()
+        for ex in self.examples:
+            label_set.update(ex["labels"])
+        return label_set
 
-        # find predicates
-        for i, w in enumerate(sent):
-            if w["pred"] != "_":
-                predicate_index = i
-                argspans = w["argspans"]
+    @staticmethod
+    def read_conllup(path):
+        sentences = []
+        current = []
 
-                labels = ["O"] * len(tokens)
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
 
-                # mark predicate
-                labels[predicate_index] = "B-V"
+                if not line:
+                    if current:
+                        sentences.append(current)
+                        current = []
+                    continue
 
-                if argspans != "_":
-                    spans = argspans.split("|")
+                if line.startswith("#"):
+                    continue
 
-                    for span in spans:
-                        role, positions = span.split(":")
-                        start, end = map(int, positions.split("-"))
+                cols = line.split("\t")
 
-                        # convert 1-based → 0-based
-                        start -= 1
-                        end -= 1
+                # skip multiword tokens like "6-7 im"
+                if "-" in cols[0]:
+                    continue
 
-                        labels[start] = f"B-{role}"
-                        for j in range(start + 1, end + 1):
-                            labels[j] = f"I-{role}"
+                token = cols[1]
+                pred = cols[8]
+                argspans = cols[10]
 
-                # insert predicate markers
-                marked_tokens = []
-                marked_labels = []
-
-                for idx, token in enumerate(tokens):
-                    if idx == predicate_index:
-                        marked_tokens.append(START_PREDICATE_TOKEN)
-                        marked_labels.append("O")
-
-                        marked_tokens.append(token)
-                        marked_labels.append(labels[idx])
-
-                        marked_tokens.append(END_PREDICATE_TOKEN)
-                        marked_labels.append("O")
-                    else:
-                        marked_tokens.append(token)
-                        marked_labels.append(labels[idx])
-
-                examples.append({
-                    "tokens": marked_tokens,
-                    "labels": marked_labels
+                current.append({
+                    "token": token,
+                    "pred": pred,
+                    "argspans": argspans
                 })
 
-    return examples
+        return sentences
+
+    @staticmethod
+    def extract_predicate_examples(sentences):
+        examples = []
+
+        for sent in sentences:
+            tokens = [w["token"] for w in sent]
+
+            # find predicates
+            for i, w in enumerate(sent):
+                if w["pred"] != "_":
+                    predicate_index = i
+                    argspans = w["argspans"]
+
+                    labels = ["O"] * len(tokens)
+
+                    # mark predicate
+                    labels[predicate_index] = "B-V"
+
+                    if argspans != "_":
+                        spans = argspans.split("|")
+
+                        for span in spans:
+                            role, positions = span.split(":")
+                            start, end = map(int, positions.split("-"))
+
+                            # convert 1-based → 0-based
+                            start -= 1
+                            end -= 1
+
+                            labels[start] = f"B-{role}"
+                            for j in range(start + 1, end + 1):
+                                labels[j] = f"I-{role}"
+
+                    # insert predicate markers
+                    marked_tokens = []
+                    marked_labels = []
+
+                    for idx, token in enumerate(tokens):
+                        if idx == predicate_index:
+                            marked_tokens.append(START_PREDICATE_TOKEN)
+                            marked_labels.append("O")
+
+                            marked_tokens.append(token)
+                            marked_labels.append(labels[idx])
+
+                            marked_tokens.append(END_PREDICATE_TOKEN)
+                            marked_labels.append("O")
+                        else:
+                            marked_tokens.append(token)
+                            marked_labels.append(labels[idx])
+
+                    examples.append({
+                        "tokens": marked_tokens,
+                        "labels": marked_labels
+                    })
+
+        return examples
 
 
-########################################
-# 3. Build label set
-########################################
+class SemanticRoleLabeler:
+    def __init__(self,
+                 train_conllup: str,
+                 validation_conllup: str,
+                 test_conllup: str,
+                 model_outdir: str = SRL_MODEL_DIR,
+                 base_model: str = SRL_BASE_MODEL,
+                 ):
+        # Set model output directory
+        self.outdir = self.init_outdir(model_outdir)
 
-def build_label_list(examples):
-    label_set = set()
-    for ex in examples:
-        label_set.update(ex["labels"])
+        # Initialize base model and tokenizer
+        self.base_model_name = base_model
+        self.tokenizer = self.init_tokenizer()
+        self.labels = set()
 
-    label_list = sorted(label_set)
-    label2id = {l: i for i, l in enumerate(label_list)}
-    id2label = {i: l for l, i in label2id.items()}
+        # Initialize semantic role datasets from input .conllup files
+        # NB: Label set is built during this step, thus should not tokenize until after
+        train_set  = self.init_input_data(train_conllup)
+        validation_set = self.init_input_data(validation_conllup)
+        test_set = self.init_input_data(test_conllup)
 
-    return label_list, label2id, id2label
+        # Extract semantic role label <-> ID mappings 
+        self.label2id, self.id2label = self.get_label_maps()
+
+        # Preprocess SemanticRoleDatasets: tokenization and alignment
+        self.train_set = self.preprocess_dataset(train_set)
+        self.validation_set = self.preprocess_dataset(validation_set)
+        self.test_set = self.preprocess_dataset(test_set)
+
+        # Initialize model
+        self.model = self.init_base_model()
+
+    @staticmethod
+    def init_outdir(outdir: str):
+        outdir = os.path.abspath(outdir)
+        try:
+            os.makedirs(outdir)
+        except FileExistsError as exc:
+            raise FileExistsError(f"Output directory {outdir} already exists; model would be overwritten.") from exc
+        return outdir
+
+    def init_tokenizer(self):
+        tokenizer = AutoTokenizer.from_pretrained(self.base_model_name)
+        special_tokens = {"additional_special_tokens": [START_PREDICATE_TOKEN, END_PREDICATE_TOKEN]}
+        tokenizer.add_special_tokens(special_tokens)
+        return tokenizer
+    
+    def init_input_data(self, data_filepath: str) -> SemanticRoleDataset:
+        dataset = SemanticRoleDataset(data_filepath)
+        self.labels.update(dataset.labels)
+        return dataset
+
+    def preprocess_dataset(self, dataset: SemanticRoleDataset) -> Dataset:
+        dataset = Dataset.from_list(dataset.examples)
+        dataset = dataset.map(
+            lambda x: self.tokenize_and_align(x),
+            batched=False
+        )
+        return dataset
+    
+    def tokenize_and_align(self, example):
+        encoding = self.tokenizer(
+            example["tokens"],
+            is_split_into_words=True,
+            truncation=True,
+            padding="max_length",
+            max_length=128
+        )
+        word_ids = encoding.word_ids()
+
+        labels = []
+        for word_id in word_ids:
+            if word_id is None:
+                labels.append(-100)
+            else:
+                labels.append(self.label2id[example["labels"][word_id]])
+
+        encoding["labels"] = labels
+        return encoding
+
+    def get_label_maps(self) -> tuple[dict, dict]:
+        label_list = sorted(self.labels)
+        label2id = {l: i for i, l in enumerate(label_list)}
+        id2label = {i: l for l, i in label2id.items()}
+        return label2id, id2label
+    
+    def init_base_model(self):
+        model = AutoModelForTokenClassification.from_pretrained(
+            self.base_model_name,
+            num_labels=len(self.labels),
+            id2label=self.id2label,
+            label2id=self.label2id,
+        )
+        model.resize_token_embeddings(len(self.tokenizer))
+        return model
+
+    def train(self, outdir: str = None, **kwargs):
+        if outdir is None:
+            outdir = self.outdir
+        training_args = TrainingArguments(
+            output_dir=outdir,
+            **kwargs
+        )
+        trainer = Trainer(
+            model=self.model,
+            args=training_args,
+            train_dataset=self.train_set,
+            eval_dataset=self.validation_set,
+        )
+        trainer.train()
+        logger.info("Model training complete.")
+
+        # Save trained model
+        trainer.save_model(outdir)
+        self.tokenizer.save_pretrained(outdir)
+        logger.info(f"Model saved to {outdir}")
 
 
-########################################
-# 4. Tokenization + alignment
-########################################
+def load_config(config_path: str) -> dict:
+    loaded_config = {}
+    with open(config_path, 'r') as f:
+        loaded_config: dict = yaml.safe_load(f)
+    return loaded_config
 
-def tokenize_and_align(example, tokenizer, label2id):
-    encoding = tokenizer(
-        example["tokens"],
-        is_split_into_words=True,
-        truncation=True,
-        padding="max_length",
-        max_length=128
+
+def main(config_path: str):
+    # Load run config
+    config = load_config(config_path=config_path)
+
+    # Extract required arguments from run config or use defaults
+    model_outdir = config.get("model_outdir", SRL_MODEL_DIR)
+    base_model_name = config.get("base_model", SRL_BASE_MODEL)
+    train_datafile = config.get("data", {}).get("train", DEFAULT_TRAIN_DATA)
+    validation_datafile = config.get("data", {}).get("validation", DEFAULT_VALIDATION_DATA)
+    test_datafile = config.get("data", {}).get("test", DEFAULT_TEST_DATA)
+    training_parameters = config.get("train", {})
+
+    # Initialize model with train/validation/test data
+    srl_model = SemanticRoleLabeler(
+        train_conllup=train_datafile,
+        validation_conllup=validation_datafile,
+        test_conllup=test_datafile,
+        base_model=base_model_name,
+        model_outdir=model_outdir,
     )
 
-    word_ids = encoding.word_ids()
-
-    labels = []
-    for word_id in word_ids:
-        if word_id is None:
-            labels.append(-100)
-        else:
-            labels.append(label2id[example["labels"][word_id]])
-
-    encoding["labels"] = labels
-    return encoding
+    # Train model
+    srl_model.train(outdir=model_outdir, **training_parameters)
 
 
-########################################
-# 5. Load data
-########################################
-
-train_sentences = read_conllup(train_datafile)
-dev_sentences = read_conllup(dev_datafile)
-test_sentences = read_conllup(test_datafile)
-
-train_examples = extract_examples(train_sentences)
-dev_examples = extract_examples(dev_sentences)
-test_examples = extract_examples(test_sentences)
-
-label_list, label2id, id2label = build_label_list(train_examples)
-
-print("Labels:", label_list)
-
-########################################
-# 6. Tokenizer
-########################################
-
-tokenizer = AutoTokenizer.from_pretrained("xlm-roberta-base")
-special_tokens = {"additional_special_tokens": [START_PREDICATE_TOKEN, END_PREDICATE_TOKEN]}
-tokenizer.add_special_tokens(special_tokens)
-
-train_dataset = Dataset.from_list(train_examples)
-dev_dataset = Dataset.from_list(dev_examples)
-test_dataset = Dataset.from_list(test_examples)
-
-train_dataset = train_dataset.map(
-    lambda x: tokenize_and_align(x, tokenizer, label2id),
-    batched=False
-)
-
-dev_dataset = dev_dataset.map(
-    lambda x: tokenize_and_align(x, tokenizer, label2id),
-    batched=False
-)
-
-test_dataset = test_dataset.map(
-    lambda x: tokenize_and_align(x, tokenizer, label2id),
-    batched=False
-)
-
-########################################
-# 7. Model
-########################################
-
-model = AutoModelForTokenClassification.from_pretrained(
-    "xlm-roberta-base",
-    num_labels=len(label_list),
-    id2label=id2label,
-    label2id=label2id
-)
-
-model.resize_token_embeddings(len(tokenizer))
-
-########################################
-# 8. Training
-########################################
-
-training_args = TrainingArguments(
-    output_dir=model_outdir,
-    learning_rate=5e-5,
-    per_device_train_batch_size=8,
-    per_device_eval_batch_size=8,
-    num_train_epochs=3,
-    eval_strategy="epoch",
-    save_strategy="epoch",
-    logging_steps=50,
-    save_total_limit=2
-)
-
-trainer = Trainer(
-    model=model,
-    args=training_args,
-    train_dataset=train_dataset,
-    eval_dataset=dev_dataset,
-    #tokenizer=tokenizer
-)
-
-trainer.train()
-
-########################################
-# 9. Save
-########################################
-
-trainer.save_model(model_outdir)
-tokenizer.save_pretrained(model_outdir)
-
-print("Training complete!")
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser("Fine-tunes a semantic role labeling model on CONLLU-formatted data with Universal Dependencies + Universal Propositions annotations.")
+    parser.add_argument('--config', default=None, help='Path to config.yml file')
+    args = parser.parse_args()
+    main(args.config)
