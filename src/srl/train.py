@@ -1,7 +1,9 @@
 import argparse
+import contextlib
 import json
 import logging
 import os
+import warnings
 
 import yaml
 from datasets import Dataset
@@ -9,12 +11,15 @@ from seqeval.metrics import (accuracy_score, f1_score, precision_score,
                              recall_score)
 from transformers import (AutoModelForTokenClassification, AutoTokenizer,
                           Trainer, TrainingArguments)
+from transformers.utils import logging as hf_logging
 
 from constants import (DEFAULT_SRL_MODEL_DIR, END_PREDICATE_TOKEN,
                        SRL_BASE_MODEL, SRL_MODEL_DATA_DIR,
                        START_PREDICATE_TOKEN)
+from utils import _LineBufferedWriter
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(levelname)s: %(message)s')
+LOG_FORMAT = "%(asctime)s %(name)s %(levelname)s: %(message)s"
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 logger = logging.getLogger(__name__)
 
 DEFAULT_TRAIN_DATA = os.path.join(SRL_MODEL_DATA_DIR, "de_gsd-ud-up-train.conllup")
@@ -181,6 +186,36 @@ class SemanticRoleLabeler:
             raise FileExistsError(f"Output directory {outdir} already exists; model would be overwritten.") from exc
         return outdir
 
+    @ staticmethod
+    def configure_logging(outdir):
+        training_log = os.path.join(os.path.abspath(outdir), "train.log")
+        logger.info(f"Training log: {training_log}")
+        root_logger = logging.getLogger()
+
+        # Avoid adding duplicate file handlers if train() is called multiple times
+        for handler in root_logger.handlers:
+            if isinstance(handler, logging.FileHandler) and handler.baseFilename == training_log:
+                return
+
+        # Remove console handlers so output is only written to the log file
+        for handler in list(root_logger.handlers):
+            if isinstance(handler, logging.StreamHandler):
+                root_logger.removeHandler(handler)
+
+        file_handler = logging.FileHandler(training_log, mode="w", encoding="utf-8")
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+        root_logger.addHandler(file_handler)
+
+        # Route transformers logs through the root logger (and disable its default console handler)
+        hf_logging.disable_default_handler()
+        hf_logging.enable_propagation()
+
+        # Capture warnings (e.g., torch warnings) into the log file
+        logging.captureWarnings(True)
+        warnings.simplefilter("default")
+        return training_log
+
     def init_tokenizer(self):
         tokenizer = AutoTokenizer.from_pretrained(self.base_model_name)
         special_tokens = {"additional_special_tokens": [START_PREDICATE_TOKEN, END_PREDICATE_TOKEN]}
@@ -240,6 +275,9 @@ class SemanticRoleLabeler:
     def train(self, outdir: str = None, **kwargs):
         if outdir is None:
             outdir = self.outdir
+        if "disable_tqdm" not in kwargs:
+            kwargs["disable_tqdm"] = True
+        training_log = self.configure_logging(outdir)
         training_args = TrainingArguments(
             output_dir=outdir,
             **kwargs
@@ -251,13 +289,16 @@ class SemanticRoleLabeler:
             eval_dataset=self.validation_set,
             compute_metrics=self.compute_metrics,
         )
-        trainer.train()
-        logger.info("Model training complete.")
+        with open(training_log, "a", encoding="utf-8", buffering=1) as logf, \
+                contextlib.redirect_stdout(_LineBufferedWriter(logf)), \
+                contextlib.redirect_stderr(_LineBufferedWriter(logf)):
+            trainer.train()
+            logger.info("Model training complete.")
 
-        # Final evaluation on test set
-        test_metrics = trainer.evaluate(self.test_set, metric_key_prefix="test")
-        self.log_metrics(test_metrics, outdir=outdir)
-        logger.info(f"Test metrics: {test_metrics}")
+            # Final evaluation on test set
+            test_metrics = trainer.evaluate(self.test_set, metric_key_prefix="test")
+            self.log_metrics(test_metrics, outdir=outdir)
+            logger.info(f"Test metrics: {test_metrics}")
 
         # Save trained model
         trainer.save_model(outdir)
