@@ -1,13 +1,15 @@
+import os
+
 from datasets import Dataset
 from transformers import (AutoModelForTokenClassification, AutoTokenizer,
                           Trainer, TrainingArguments)
 
 from constants import END_PREDICATE_TOKEN, START_PREDICATE_TOKEN
 
-train_datafile = '/Users/pgeorgis/Documents/tools/Universal Dependencies 2.9/ud_up_test/de_gsd-ud-up-train.conllup'
-dev_datafile = '/Users/pgeorgis/Documents/tools/Universal Dependencies 2.9/ud_up_test/de_gsd-ud-up-dev.conllup'
-test_datafile = '/Users/pgeorgis/Documents/tools/Universal Dependencies 2.9/ud_up_test/de_gsd-ud-up-test.conllup'
-model_outdir = '/Users/pgeorgis/Documents/projects/c07-dpron-korpus/models/srl'
+model_outdir = os.path.abspath("./models/srl")
+train_datafile = os.path.join(model_outdir, "data", "de_gsd-ud-up-train.conllup")
+dev_datafile = os.path.join(model_outdir, "data", "de_gsd-ud-up-dev.conllup")
+test_datafile = os.path.join(model_outdir, "data", "de_gsd-ud-up-test.conllup")
 
 ########################################
 # 1. Parse CONLLUP
