@@ -1,6 +1,8 @@
-from transformers import AutoTokenizer, AutoModelForTokenClassification, TrainingArguments, Trainer
 from datasets import Dataset
-from constants import START_PREDICATE_TOKEN, END_PREDICATE_TOKEN
+from transformers import (AutoModelForTokenClassification, AutoTokenizer,
+                          Trainer, TrainingArguments)
+
+from constants import END_PREDICATE_TOKEN, START_PREDICATE_TOKEN
 
 train_datafile = '/Users/pgeorgis/Documents/tools/Universal Dependencies 2.9/ud_up_test/de_gsd-ud-up-train.conllup'
 dev_datafile = '/Users/pgeorgis/Documents/tools/Universal Dependencies 2.9/ud_up_test/de_gsd-ud-up-dev.conllup'

@@ -1,6 +1,7 @@
 import spacy
-from transformers import AutoTokenizer, AutoModelForTokenClassification
 import torch
+from transformers import AutoModelForTokenClassification, AutoTokenizer
+
 from constants import DEFAULT_SPACY_MODEL
 
 ########################################
