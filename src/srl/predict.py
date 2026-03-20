@@ -4,8 +4,8 @@ import spacy
 import torch
 from transformers import AutoModelForTokenClassification, AutoTokenizer
 
-from constants import (DEFAULT_SPACY_MODEL, END_PREDICATE_TOKEN, SRL_MODEL_DIR,
-                       START_PREDICATE_TOKEN, VERB_TAGS)
+from constants import (DEFAULT_SPACY_MODEL, DEFAULT_SRL_MODEL_DIR,
+                       END_PREDICATE_TOKEN, START_PREDICATE_TOKEN, VERB_TAGS)
 
 
 def load_pretrained_srl_model(model_dir: str) -> tuple:
@@ -83,7 +83,7 @@ def pretty_print_srl(predicate, srl_prediction):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Loads a pretrained semantic role labeling model and performs prediction on a given text.")
     parser.add_argument('--text', help='Input text to label with semantic roles')
-    parser.add_argument('--srl_model', default=SRL_MODEL_DIR, help='Path to pretrained semantic role labeling model')
+    parser.add_argument('--srl_model', default=DEFAULT_SRL_MODEL_DIR, help='Path to pretrained semantic role labeling model')
     parser.add_argument('--spacy_model', default=DEFAULT_SPACY_MODEL, help='Name of spaCy model for preprocessing text (NB: must have been pre-downloaded)')
     args = parser.parse_args()
 
