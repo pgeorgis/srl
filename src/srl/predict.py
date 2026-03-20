@@ -16,7 +16,22 @@ def load_pretrained_srl_model(model_dir: str) -> tuple:
 
 def get_predicate_indices(doc):
     """Return indices of verbs/auxiliaries"""
-    return [i for i, tok in enumerate(doc) if tok.pos_ in VERB_TAGS]
+    verbs_and_aux = [idx for idx, tok in enumerate(doc) if tok.pos_ in VERB_TAGS]
+    predicate_idx = []
+    heads_to_skip = set()
+    for idx in verbs_and_aux:
+        token = doc[idx]
+        if token.tag_ in {
+            'VVPP',     # past participle, e.g. <hat ... gesehen>
+            'VAPP',     # auxiliary past participle, e.g. <ist ... gewesen>
+            'VMPP',     # modal past participle, e.g. <hat ... gekonnt>
+            'VVINF',    # full infinitive, e.g. <würde ... sehen> 
+            'VMINF',    # modal infinitive, e.g. <hätte ... sehen können>
+        } and token.has_head():
+            heads_to_skip.add(token.head.i)
+        predicate_idx.append(idx)
+    predicate_idx = [idx for idx in predicate_idx if idx not in heads_to_skip]
+    return predicate_idx
 
 
 def mark_predicate(tokens, pred_index):
