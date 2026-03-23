@@ -60,7 +60,7 @@ For each predicate in a sentence:
 This yields one training instance per predicate with a token sequence and a BIO label sequence of the same length.
 
 ## Model
-- Default base model: `xlm-roberta-base`
+- Default base model: [`liaad/srl-en_xlmr-base`](https://huggingface.co/liaad/srl-en_xlmr-base)
 - Task head: token classification with one label per token
 - Special tokens are added to the tokenizer and embedding matrix is resized
 

@@ -14,5 +14,6 @@
   "pad_token": "<pad>",
   "sep_token": "</s>",
   "tokenizer_class": "XLMRobertaTokenizer",
+  "unk_id": 0,
   "unk_token": "<unk>"
 }
