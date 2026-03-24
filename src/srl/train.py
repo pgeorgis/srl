@@ -6,7 +6,6 @@ import os
 import warnings
 
 import matplotlib.pyplot as plt
-import yaml
 from datasets import Dataset
 from seqeval.metrics import (accuracy_score, f1_score, precision_score,
                              recall_score)
@@ -17,7 +16,7 @@ from transformers.utils import logging as hf_logging
 from constants import (DEFAULT_SRL_MODEL_DIR, END_PREDICATE_TOKEN,
                        SRL_BASE_MODEL, SRL_MODEL_DATA_DIR,
                        START_PREDICATE_TOKEN)
-from utils import _LineBufferedWriter
+from utils import _LineBufferedWriter, load_config
 
 LOG_FORMAT = "%(asctime)s %(name)s %(levelname)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
@@ -403,13 +402,6 @@ class SemanticRoleLabeler:
         fig.savefig(output_path, dpi=150)
         plt.close(fig)
         logger.info(f"Plotted training curves to {output_path}")
-
-
-def load_config(config_path: str) -> dict:
-    loaded_config = {}
-    with open(config_path, 'r') as f:
-        loaded_config: dict = yaml.safe_load(f)
-    return loaded_config
 
 
 def main(config_path: str):
