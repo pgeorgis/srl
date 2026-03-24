@@ -2,13 +2,15 @@ import argparse
 
 import spacy
 import torch
-from transformers import AutoModelForTokenClassification, AutoTokenizer
+from spacy.tokens import Doc
+from transformers import (AutoModelForTokenClassification, AutoTokenizer,
+                          PreTrainedModel, PreTrainedTokenizerBase)
 
 from constants import (DEFAULT_SPACY_MODEL, DEFAULT_SRL_MODEL_DIR,
                        END_PREDICATE_TOKEN, START_PREDICATE_TOKEN, VERB_TAGS)
 
 
-def load_pretrained_srl_model(model_dir: str) -> tuple:
+def load_pretrained_srl_model(model_dir: str) -> tuple[PreTrainedModel, PreTrainedTokenizerBase]:
     model = AutoModelForTokenClassification.from_pretrained(model_dir)
     tokenizer = AutoTokenizer.from_pretrained(model_dir)
     return model, tokenizer
@@ -95,6 +97,27 @@ def pretty_print_srl(predicate, srl_prediction):
         print(f"{tok:20} {label}")
 
 
+def annotate_srl(
+        preproc_doc: Doc,
+        srl_model: PreTrainedModel,
+        srl_tokenizer: PreTrainedTokenizerBase,
+        pretty_print: bool = False,
+        ):
+    tokens = [tk.text for tk in preproc_doc]
+    # Get indices of predicates in text
+    pred_indices = get_predicate_indices(preproc_doc)
+    # Perform SRL prediction for each predicate
+    srl_predictions = {}
+    for pred_idx in pred_indices:
+        predicate = tokens[pred_idx]
+        prediction = predict_srl(tokens, pred_idx, srl_model, srl_tokenizer)
+        srl_predictions[pred_idx] = prediction
+        # Optionally pretty-print results
+        if pretty_print:
+            pretty_print_srl(predicate, prediction)
+    return srl_predictions
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Loads a pretrained semantic role labeling model and performs prediction on a given text.")
     parser.add_argument('--text', help='Input text to label with semantic roles')
@@ -106,16 +129,11 @@ if __name__ == "__main__":
     nlp_preproc = spacy.load(args.spacy_model)
     model, tokenizer = load_pretrained_srl_model(args.srl_model)
 
-    # Preprocess text into syntactically/morphologically tagged tokens with spaCy pipeline
+    # Annotate and pretty-print semantic role label predictions
     print(f"Text: {args.text}")
-    doc = nlp_preproc(args.text)
-    tokens = [tk.text for tk in doc]
-
-    # Get indices of predicates in text
-    pred_indices = get_predicate_indices(doc)
-
-    # Perform SRL prediction for each predicate and pretty-print results
-    for pred_idx in pred_indices:
-        predicate = tokens[pred_idx]
-        prediction = predict_srl(tokens, pred_idx, model, tokenizer)
-        pretty_print_srl(predicate, prediction)
+    annotate_srl(
+        preproc_doc=nlp_preproc(args.text),
+        srl_model=model,
+        srl_tokenizer=tokenizer,
+        pretty_print=True,
+    )

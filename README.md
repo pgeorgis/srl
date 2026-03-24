@@ -65,6 +65,7 @@ This yields one training instance per predicate with a token sequence and a BIO 
 - Special tokens are added to the tokenizer and embedding matrix is resized
 
 ### Training
+- Training is performed with the [`train_srl_model.py`](./train_srl_model.py) script together with an input config .yml file (e.g. [`srl_config.yml`](./srl_config.yml)).
 - Tokenization uses `is_split_into_words=True` and aligns word-level BIO labels to subword tokens.
 - Loss ignores special tokens and padding (label `-100`).
 - Validation is performed during training with `seqeval` metrics.
@@ -78,3 +79,60 @@ This yields one training instance per predicate with a token sequence and a BIO 
 - `test_metrics.json`: final test evaluation metrics
 - `training_curves.png`: plot of loss and accuracy curves during training
 - model and tokenizer artifacts
+
+## Inference
+The model can be run to annotate the semantic roles of arguments in novel input sentences using the script [`predict_srl.py`](../../predict_srl.py).
+
+Example usage:
+
+```
+python3 predict_srl.py --text "Die Kirche, die die Dorfbewohner während des Krieges als Zufluchtsort benutzten, wurde von Mönchen im 14. Jahrhundert erbaut."
+
+Text: Die Kirche, die die Dorfbewohner während des Krieges als Zufluchtsort benutzten, wurde von Mönchen im 14. Jahrhundert erbaut.
+
+=== Predicate: benutzten ===
+Die                  B-A1
+Kirche               I-A1
+,                    O
+die                  O
+die                  B-A1
+Dorfbewohner         I-A1
+während              B-AM-TMP
+des                  I-AM-TMP
+Krieges              I-AM-TMP
+als                  B-A2
+Zufluchtsort         I-A2
+benutzten            B-V
+,                    O
+wurde                O
+von                  O
+Mönchen              O
+im                   O
+14.                  O
+Jahrhundert          O
+erbaut               O
+.                    O
+
+=== Predicate: erbaut ===
+Die                  B-A1
+Kirche               I-A1
+,                    I-A1
+die                  I-A1
+die                  I-A1
+Dorfbewohner         O
+während              O
+des                  O
+Krieges              O
+als                  O
+Zufluchtsort         O
+benutzten            O
+,                    O
+wurde                O
+von                  B-A0
+Mönchen              I-A0
+im                   B-AM-TMP
+14.                  I-AM-TMP
+Jahrhundert          I-AM-TMP
+erbaut               B-V
+.                    O
+```
