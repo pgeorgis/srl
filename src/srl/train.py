@@ -13,7 +13,7 @@ from transformers import (AutoModelForTokenClassification, AutoTokenizer,
                           Trainer, TrainingArguments)
 from transformers.utils import logging as hf_logging
 
-from constants import (DEFAULT_SRL_MODEL_DIR, END_PREDICATE_TOKEN,
+from constants import (DEFAULT_SRL_MODEL_DIR, END_PREDICATE_TOKEN, NULL_SRL,
                        SRL_BASE_MODEL, SRL_MODEL_DATA_DIR,
                        START_PREDICATE_TOKEN)
 from utils import _LineBufferedWriter, load_config
@@ -94,7 +94,7 @@ class SemanticRoleDataset:
                     predicate_index = i
                     argspans = w["argspans"]
 
-                    labels = ["O"] * len(tokens)
+                    labels = [NULL_SRL] * len(tokens)
 
                     # mark predicate
                     labels[predicate_index] = "B-V"
@@ -121,13 +121,13 @@ class SemanticRoleDataset:
                     for idx, token in enumerate(tokens):
                         if idx == predicate_index:
                             marked_tokens.append(START_PREDICATE_TOKEN)
-                            marked_labels.append("O")
+                            marked_labels.append(NULL_SRL)
 
                             marked_tokens.append(token)
                             marked_labels.append(labels[idx])
 
                             marked_tokens.append(END_PREDICATE_TOKEN)
-                            marked_labels.append("O")
+                            marked_labels.append(NULL_SRL)
                         else:
                             marked_tokens.append(token)
                             marked_labels.append(labels[idx])
