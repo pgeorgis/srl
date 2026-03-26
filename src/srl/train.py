@@ -13,7 +13,8 @@ from transformers import (AutoModelForTokenClassification, AutoTokenizer,
                           Trainer, TrainingArguments)
 from transformers.utils import logging as hf_logging
 
-from constants import (DEFAULT_SRL_MODEL_DIR, END_PREDICATE_TOKEN, NULL_SRL,
+from constants import (BEGINNING_TAG, DEFAULT_SRL_MODEL_DIR,
+                       END_PREDICATE_TOKEN, INSIDE_TAG, NULL_SRL_TAG,
                        SRL_BASE_MODEL, SRL_MODEL_DATA_DIR,
                        START_PREDICATE_TOKEN)
 from utils import _LineBufferedWriter, load_config
@@ -94,10 +95,10 @@ class SemanticRoleDataset:
                     predicate_index = i
                     argspans = w["argspans"]
 
-                    labels = [NULL_SRL] * len(tokens)
+                    labels = [NULL_SRL_TAG] * len(tokens)
 
                     # mark predicate
-                    labels[predicate_index] = "B-V"
+                    labels[predicate_index] = f"{BEGINNING_TAG}-V"
 
                     if argspans != "_":
                         spans = argspans.split("|")
@@ -110,9 +111,9 @@ class SemanticRoleDataset:
                             start -= 1
                             end -= 1
 
-                            labels[start] = f"B-{role}"
+                            labels[start] = f"{BEGINNING_TAG}-{role}"
                             for j in range(start + 1, end + 1):
-                                labels[j] = f"I-{role}"
+                                labels[j] = f"{INSIDE_TAG}-{role}"
 
                     # insert predicate markers
                     marked_tokens = []
@@ -121,13 +122,13 @@ class SemanticRoleDataset:
                     for idx, token in enumerate(tokens):
                         if idx == predicate_index:
                             marked_tokens.append(START_PREDICATE_TOKEN)
-                            marked_labels.append(NULL_SRL)
+                            marked_labels.append(NULL_SRL_TAG)
 
                             marked_tokens.append(token)
                             marked_labels.append(labels[idx])
 
                             marked_tokens.append(END_PREDICATE_TOKEN)
-                            marked_labels.append(NULL_SRL)
+                            marked_labels.append(NULL_SRL_TAG)
                         else:
                             marked_tokens.append(token)
                             marked_labels.append(labels[idx])
