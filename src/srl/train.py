@@ -3,6 +3,7 @@ import contextlib
 import json
 import logging
 import os
+import sys
 import warnings
 
 import matplotlib.pyplot as plt
@@ -276,8 +277,7 @@ class SemanticRoleLabeler:
     def train(self, outdir: str = None, **kwargs):
         if outdir is None:
             outdir = self.outdir
-        if "disable_tqdm" not in kwargs:
-            kwargs["disable_tqdm"] = True
+        kwargs["disable_tqdm"] = not sys.stderr.isatty()
         training_log = self.configure_logging(outdir)
         training_args = TrainingArguments(
             output_dir=outdir,
