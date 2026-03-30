@@ -10,10 +10,14 @@ data:
 # Training parameters
 train:
     num_train_epochs: 3
-    eval_strategy: steps
+    eval_strategy: epoch
     save_strategy: epoch
     logging_steps: 50
     save_total_limit: 2
+    # Early stopping
+    load_best_model_at_end: True
+    metric_for_best_model: eval_f1
+    greater_is_better: True
 
 # Directory to save model configs, checkpoints, and final model
-model_outdir: ./models/srl/liaad/srl-en_xlmr-base
+model_outdir: ./models/srl/pretrained/liaad/srl-en_xlmr-base
