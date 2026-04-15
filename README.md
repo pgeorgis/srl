@@ -94,9 +94,9 @@ Text: Die Kirche, die die Dorfbewohner während des Krieges als Zufluchtsort ben
 Die                  B-A1
 Kirche               I-A1
 ,                    O
-die                  O
-die                  B-A1
-Dorfbewohner         I-A1
+die                  B-R-A1
+die                  B-A0
+Dorfbewohner         I-A0
 während              B-AM-TMP
 des                  I-AM-TMP
 Krieges              I-AM-TMP
