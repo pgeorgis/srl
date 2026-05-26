@@ -1,4 +1,5 @@
 import argparse
+import logging
 from dataclasses import dataclass
 
 import spacy
@@ -10,6 +11,8 @@ from transformers import (AutoModelForTokenClassification, AutoTokenizer,
 from constants import (DEFAULT_SPACY_MODEL, DEFAULT_SRL_MODEL_DIR,
                        END_PREDICATE_TOKEN, START_PREDICATE_TOKEN, VERB_TAGS)
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(levelname)s: %(message)s')
+logger = logging.getLogger(__name__)
 
 @dataclass
 class SRLModel:
@@ -76,6 +79,7 @@ class SRLModel:
 
 
 def load_pretrained_srl_model(model_dir: str) -> SRLModel:
+    logger.info(f"Loading SRL model from {model_dir} ...")
     model = AutoModelForTokenClassification.from_pretrained(model_dir)
     tokenizer = AutoTokenizer.from_pretrained(model_dir)
     return SRLModel(
