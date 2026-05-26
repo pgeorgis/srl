@@ -1,4 +1,5 @@
 import argparse
+from dataclasses import dataclass
 
 import spacy
 import torch
@@ -10,10 +11,19 @@ from constants import (DEFAULT_SPACY_MODEL, DEFAULT_SRL_MODEL_DIR,
                        END_PREDICATE_TOKEN, START_PREDICATE_TOKEN, VERB_TAGS)
 
 
-def load_pretrained_srl_model(model_dir: str) -> tuple[PreTrainedModel, PreTrainedTokenizerBase]:
+@dataclass
+class LoadedSRLModel:
+    model: PreTrainedModel
+    tokenizer: PreTrainedTokenizerBase
+
+
+def load_pretrained_srl_model(model_dir: str) -> LoadedSRLModel:
     model = AutoModelForTokenClassification.from_pretrained(model_dir)
     tokenizer = AutoTokenizer.from_pretrained(model_dir)
-    return model, tokenizer
+    return LoadedSRLModel(
+        model=model,
+        tokenizer=tokenizer,
+    )
 
 
 def get_predicate_indices(doc):
@@ -49,10 +59,11 @@ def mark_predicate(tokens, pred_index):
 
 def predict_srl(tokens: list,
                 pred_index: int,
-                model,
-                tokenizer,
+                srl_model: LoadedSRLModel,
                 ):
     """Run SRL for one predicate"""
+    model = srl_model.model
+    tokenizer = srl_model.tokenizer
     model.eval()  # switch model to evaluation mode
     marked_tokens = mark_predicate(tokens, pred_index)
     encoding = tokenizer(
@@ -99,8 +110,7 @@ def pretty_print_srl(predicate, srl_prediction):
 
 def annotate_srl(
         preproc_doc: Doc,
-        srl_model: PreTrainedModel,
-        srl_tokenizer: PreTrainedTokenizerBase,
+        srl_model: LoadedSRLModel,
         pretty_print: bool = False,
         ):
     tokens = [tk.text for tk in preproc_doc]
@@ -110,7 +120,7 @@ def annotate_srl(
     srl_predictions = {}
     for pred_idx in pred_indices:
         predicate = tokens[pred_idx]
-        prediction = predict_srl(tokens, pred_idx, srl_model, srl_tokenizer)
+        prediction = predict_srl(tokens, pred_idx, srl_model)
         srl_predictions[pred_idx] = prediction
         # Optionally pretty-print results
         if pretty_print:
@@ -127,13 +137,12 @@ if __name__ == "__main__":
 
     # Load models
     nlp_preproc = spacy.load(args.spacy_model)
-    model, tokenizer = load_pretrained_srl_model(args.srl_model)
+    srl_model = load_pretrained_srl_model(args.srl_model)
 
     # Annotate and pretty-print semantic role label predictions
     print(f"Text: {args.text}")
     annotate_srl(
         preproc_doc=nlp_preproc(args.text),
-        srl_model=model,
-        srl_tokenizer=tokenizer,
+        srl_model=srl_model,
         pretty_print=True,
     )
