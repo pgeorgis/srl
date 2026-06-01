@@ -4,7 +4,6 @@ from dataclasses import dataclass
 
 import spacy
 import torch
-from spacy.tokens import Doc
 from transformers import (AutoModelForTokenClassification, AutoTokenizer,
                           PreTrainedModel, PreTrainedTokenizerBase)
 
@@ -60,17 +59,14 @@ class SRLModel:
         return results
 
     def annotate_srl(self,
-                     preproc_doc: Doc,
-                     pretty_print: bool = False
+                     token_texts: list,
+                     pred_indices: list,
+                     pretty_print: bool = False,
                      ) -> dict:
-        tokens = [tk.text for tk in preproc_doc]
-        # Get indices of predicates in text
-        pred_indices = get_predicate_indices(preproc_doc)
-        # Perform SRL prediction for each predicate
         srl_predictions = {}
         for pred_idx in pred_indices:
-            predicate = tokens[pred_idx]
-            prediction = self.predict_srl(tokens, pred_idx)
+            predicate = token_texts[pred_idx]
+            prediction = self.predict_srl(token_texts, pred_idx)
             srl_predictions[pred_idx] = prediction
             # Optionally pretty-print results
             if pretty_print:
@@ -88,24 +84,29 @@ def load_pretrained_srl_model(model_dir: str) -> SRLModel:
     )
 
 
-def get_predicate_indices(doc):
-    """Return indices of verbs/auxiliaries"""
-    verbs_and_aux = [idx for idx, tok in enumerate(doc) if tok.pos_ in VERB_TAGS]
+def get_predicate_indices(tokens: list, doc_offset: int = 0) -> list:
+    """Return sentence-relative predicate indices from a sentence-level list of serialized token dicts.
+
+    doc_offset: absolute token index of the first token in this sentence within the document,
+    used to correctly map document-level head indices back to sentence-relative indices.
+    """
+    verbs_and_aux = [idx for idx, tok in enumerate(tokens) if tok["pos"] in VERB_TAGS]
     predicate_idx = []
     heads_to_skip = set()
     for idx in verbs_and_aux:
-        token = doc[idx]
-        if token.tag_ in {
+        token = tokens[idx]
+        if token.get("tag") in {
             'VVPP',     # past participle, e.g. <hat ... gesehen>
             'VAPP',     # auxiliary past participle, e.g. <ist ... gewesen>
             'VMPP',     # modal past participle, e.g. <hat ... gekonnt>
             'VVINF',    # full infinitive, e.g. <würde ... sehen> 
             'VMINF',    # modal infinitive, e.g. <hätte ... sehen können>
-        } and token.has_head():
-            heads_to_skip.add(token.head.i)
+        } and "head" in token.get("dep", {}):
+            head_sent_idx = token["dep"]["head"] - doc_offset
+            if 0 <= head_sent_idx < len(tokens):
+                heads_to_skip.add(head_sent_idx)
         predicate_idx.append(idx)
-    predicate_idx = [idx for idx in predicate_idx if idx not in heads_to_skip]
-    return predicate_idx
+    return [idx for idx in predicate_idx if idx not in heads_to_skip]
 
 
 def mark_predicate(tokens, pred_index):
@@ -139,7 +140,19 @@ if __name__ == "__main__":
 
     # Annotate and pretty-print semantic role label predictions
     print(f"Text: {args.text}")
-    srl_model.annotate_srl(
-        preproc_doc=nlp_preproc(args.text),
-        pretty_print=True,
-    )
+    doc = nlp_preproc(args.text)
+    token_dicts = [
+        {
+            "text": t.text,
+            "pos": t.pos_,
+            "tag": t.tag_,
+            "dep": {
+                "tag": t.dep_,
+                "head": t.head.i
+            } if t.has_head() else {"tag": t.dep_}
+        }
+        for t in doc
+    ]
+    token_texts = [t["text"] for t in token_dicts]
+    pred_indices = get_predicate_indices(token_dicts, doc_offset=0)
+    srl_model.annotate_srl(token_texts=token_texts, pred_indices=pred_indices, pretty_print=True)
