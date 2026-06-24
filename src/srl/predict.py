@@ -8,8 +8,8 @@ from transformers import (AutoModelForTokenClassification, AutoTokenizer,
                           PreTrainedModel, PreTrainedTokenizerBase)
 
 from constants import (DEFAULT_SPACY_MODEL, DEFAULT_SRL_MODEL_DIR,
-                       END_PREDICATE_TOKEN, PAST_PARTICIPLE_TAG,
-                       START_PREDICATE_TOKEN, VERB_TAGS)
+                       END_PREDICATE_TOKEN, PAST_PARTICIPLE_AUX_TAG,
+                       PAST_PARTICIPLE_TAG, START_PREDICATE_TOKEN, VERB_TAGS)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
@@ -98,7 +98,7 @@ def get_predicate_indices(tokens: list, doc_offset: int = 0) -> list:
         token = tokens[idx]
         if token.get("tag") in {
             PAST_PARTICIPLE_TAG,     # (VVPP) past participle, e.g. <hat ... gesehen>
-            'VAPP',                  # auxiliary past participle, e.g. <ist ... gewesen>
+            PAST_PARTICIPLE_AUX_TAG, # (VAPP) auxiliary past participle, e.g. <ist ... gewesen>
             'VMPP',                  # modal past participle, e.g. <hat ... gekonnt>
             'VVINF',                 # full infinitive, e.g. <würde ... sehen> 
             'VMINF',                 # modal infinitive, e.g. <hätte ... sehen können>
