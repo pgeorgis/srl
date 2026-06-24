@@ -8,7 +8,8 @@ from transformers import (AutoModelForTokenClassification, AutoTokenizer,
                           PreTrainedModel, PreTrainedTokenizerBase)
 
 from constants import (DEFAULT_SPACY_MODEL, DEFAULT_SRL_MODEL_DIR,
-                       END_PREDICATE_TOKEN, START_PREDICATE_TOKEN, VERB_TAGS)
+                       END_PREDICATE_TOKEN, PAST_PARTICIPLE_TAG,
+                       START_PREDICATE_TOKEN, VERB_TAGS)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
@@ -96,11 +97,11 @@ def get_predicate_indices(tokens: list, doc_offset: int = 0) -> list:
     for idx in verbs_and_aux:
         token = tokens[idx]
         if token.get("tag") in {
-            'VVPP',     # past participle, e.g. <hat ... gesehen>
-            'VAPP',     # auxiliary past participle, e.g. <ist ... gewesen>
-            'VMPP',     # modal past participle, e.g. <hat ... gekonnt>
-            'VVINF',    # full infinitive, e.g. <würde ... sehen> 
-            'VMINF',    # modal infinitive, e.g. <hätte ... sehen können>
+            PAST_PARTICIPLE_TAG,     # (VVPP) past participle, e.g. <hat ... gesehen>
+            'VAPP',                  # auxiliary past participle, e.g. <ist ... gewesen>
+            'VMPP',                  # modal past participle, e.g. <hat ... gekonnt>
+            'VVINF',                 # full infinitive, e.g. <würde ... sehen> 
+            'VMINF',                 # modal infinitive, e.g. <hätte ... sehen können>
         } and "head" in token.get("dep", {}):
             head_sent_idx = token["dep"]["head"] - doc_offset
             if 0 <= head_sent_idx < len(tokens):
