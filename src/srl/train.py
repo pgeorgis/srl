@@ -14,10 +14,10 @@ from transformers import (AutoModelForTokenClassification, AutoTokenizer,
                           Trainer, TrainingArguments)
 from transformers.utils import logging as hf_logging
 
-from constants import (BEGINNING_TAG, DEFAULT_SRL_MODEL_DIR,
-                       END_PREDICATE_TOKEN, INSIDE_TAG, NULL_SRL_TAG,
-                       SRL_BASE_MODEL, SRL_MODEL_DATA_DIR,
-                       START_PREDICATE_TOKEN)
+from constants.models import (DEFAULT_SRL_MODEL_DIR, SRL_BASE_MODEL,
+                              SRL_MODEL_DATA_DIR)
+from constants.tags import (BEGINNING_TAG, END_PREDICATE_TOKEN, INSIDE_TAG,
+                            NULL_SRL_TAG, START_PREDICATE_TOKEN)
 from utils import _LineBufferedWriter, load_config
 
 LOG_FORMAT = "%(asctime)s %(name)s %(levelname)s: %(message)s"
