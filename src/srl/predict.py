@@ -8,8 +8,8 @@ from transformers import (AutoModelForTokenClassification, AutoTokenizer,
                           PreTrainedModel, PreTrainedTokenizerBase)
 
 from constants.models import DEFAULT_SPACY_MODEL, DEFAULT_SRL_MODEL_DIR
-from constants.tags import (END_PREDICATE_TOKEN, PAST_PARTICIPLE_AUX_TAG,
-                            PAST_PARTICIPLE_TAG, START_PREDICATE_TOKEN,
+from constants.srl import END_PREDICATE_TOKEN, START_PREDICATE_TOKEN
+from constants.tags import (PAST_PARTICIPLE_AUX_TAG, PAST_PARTICIPLE_TAG,
                             VERB_TAGS)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(levelname)s: %(message)s')
