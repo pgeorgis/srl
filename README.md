@@ -81,12 +81,12 @@ This yields one training instance per predicate with a token sequence and a BIO 
 - model and tokenizer artifacts
 
 ## Inference
-The model can be run to annotate the semantic roles of arguments in novel input sentences using the script [`predict_srl.py`](../../predict_srl.py).
+The model can be run to annotate the semantic roles of arguments in novel input sentences using the script [`predict_srl.py`](./predict_srl.py).
 
-Example usage:
+Example usage (run from the project root, using the main project virtual environment):
 
 ```
-python3 predict_srl.py --text "Die Kirche, die die Dorfbewohner während des Krieges als Zufluchtsort benutzten, wurde von Mönchen im 14. Jahrhundert erbaut."
+python3 -m models.srl.predict_srl --text "Die Kirche, die die Dorfbewohner während des Krieges als Zufluchtsort benutzten, wurde von Mönchen im 14. Jahrhundert erbaut."
 
 Text: Die Kirche, die die Dorfbewohner während des Krieges als Zufluchtsort benutzten, wurde von Mönchen im 14. Jahrhundert erbaut.
 

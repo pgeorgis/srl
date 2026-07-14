@@ -18,7 +18,7 @@ from constants.models import (DEFAULT_SRL_MODEL_DIR, SRL_BASE_MODEL,
                               SRL_MODEL_DATA_DIR)
 from constants.srl import (BEGINNING_TAG, END_PREDICATE_TOKEN, INSIDE_TAG,
                            NULL_SRL_TAG, START_PREDICATE_TOKEN)
-from utils import LineBufferedWriter, load_config
+from utils.utils import LineBufferedWriter, load_config
 
 LOG_FORMAT = "%(asctime)s %(name)s %(levelname)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
