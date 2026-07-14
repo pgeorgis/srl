@@ -14,11 +14,11 @@ from transformers import (AutoModelForTokenClassification, AutoTokenizer,
                           Trainer, TrainingArguments)
 from transformers.utils import logging as hf_logging
 
-from constants import (BEGINNING_TAG, DEFAULT_SRL_MODEL_DIR,
-                       END_PREDICATE_TOKEN, INSIDE_TAG, NULL_SRL_TAG,
-                       SRL_BASE_MODEL, SRL_MODEL_DATA_DIR,
-                       START_PREDICATE_TOKEN)
-from utils import _LineBufferedWriter, load_config
+from constants.models import (DEFAULT_SRL_MODEL_DIR, SRL_BASE_MODEL,
+                              SRL_MODEL_DATA_DIR)
+from constants.srl import (BEGINNING_TAG, END_PREDICATE_TOKEN, INSIDE_TAG,
+                           NULL_SRL_TAG, START_PREDICATE_TOKEN)
+from utils.utils import LineBufferedWriter, load_config
 
 LOG_FORMAT = "%(asctime)s %(name)s %(levelname)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
@@ -291,8 +291,8 @@ class SemanticRoleLabeler:
             compute_metrics=self.compute_metrics,
         )
         with open(training_log, "a", encoding="utf-8", buffering=1) as logf, \
-                contextlib.redirect_stdout(_LineBufferedWriter(logf)), \
-                contextlib.redirect_stderr(_LineBufferedWriter(logf)):
+                contextlib.redirect_stdout(LineBufferedWriter(logf)), \
+                contextlib.redirect_stderr(LineBufferedWriter(logf)):
             trainer.train()
             logger.info("Model training complete.")
 
