@@ -203,9 +203,23 @@ erbaut               B-V
 .                    O
 ```
 
+### Post-processing
+The model outputs a BIO label per token for each predicate. [`postprocess.py`](./src/srl/postprocess.py) converts these into argument spans for a whole parsed document:
+```python
+from srl import SRLModel, postproc_srl, combine_postproc_srls
+
+# tokens: token dicts for the whole document (keys "text", "pos", "tag", "dep"), e.g. from token_dicts_from_spacy(doc)
+# sentences: {sentence index: [first token index, end token index]}
+srls = postproc_srl(tokens, sentences, SRLModel.from_pretrained())
+# {predicate token index: {"text": "jagt", "args": [{"span": [0, 1], "text": "Der Hund", "label": "A0"}, ...]}}
+
+combined = combine_postproc_srls(srls)  # {token index: [{"pred_idx", "predicate", "srl"}, ...]} over all predicates
+```
+
 ## Repository structure
 * [`src/srl/`](./src/srl/)
     * [`predict.py`](./src/srl/predict.py): `SRLModel` (prediction), `get_predicate_indices`, command-line interface.
+    * [`postprocess.py`](./src/srl/postprocess.py): `postproc_srl` and `combine_postproc_srls` (BIO labels to argument spans).
     * [`train.py`](./src/srl/train.py): fine-tuning on `.conllup` data.
     * [`paths.py`](./src/srl/paths.py), [`constants.py`](./src/srl/constants.py): locating the trained model, special tokens, BIO tags, and defaults.
 * [`configs/srl_config.yml`](./configs/srl_config.yml): example training configuration.
