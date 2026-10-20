@@ -17,12 +17,17 @@ cli = [
 ]
 # Fine-tuning new models
 train = [
+    "numpy>=2.0",  # pyarrow (via datasets) needs NumPy 2, whereas the cli extra needs numpy<2
     "accelerate>=1.1",
     "datasets>=4.0",
     "seqeval>=1.2",
     "matplotlib>=3.8",
     "PyYAML>=6.0",
 ]
+
+[tool.uv]
+# The CLI's spaCy 3.5 needs numpy<2, whereas the training dependencies (pyarrow) need numpy>=2
+conflicts = [[{ extra = "cli" }, { extra = "train" }]]
 
 [dependency-groups]
 dev = ["pytest>=8"]
