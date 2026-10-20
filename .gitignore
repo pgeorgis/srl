@@ -1,0 +1,10 @@
+.venv/
+.DS_Store
+__pycache__/
+*.egg-info/
+.pytest_cache/
+
+# Trained SRL models and checkpoints
+pretrained/
+**/checkpoint*
+**/train.log

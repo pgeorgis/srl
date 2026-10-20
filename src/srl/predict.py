@@ -2,23 +2,30 @@ import argparse
 import logging
 from dataclasses import dataclass
 
-import spacy
 import torch
 from transformers import (AutoModelForTokenClassification, AutoTokenizer,
                           PreTrainedModel, PreTrainedTokenizerBase)
 
-from constants.models import DEFAULT_SPACY_MODEL, DEFAULT_SRL_MODEL_DIR
-from constants.srl import END_PREDICATE_TOKEN, START_PREDICATE_TOKEN
-from constants.tags import (PAST_PARTICIPLE_AUX_TAG, PAST_PARTICIPLE_TAG,
-                            VERB_TAGS)
+from .constants import (DEFAULT_SPACY_MODEL, END_PREDICATE_TOKEN,
+                        PAST_PARTICIPLE_AUX_TAG, PAST_PARTICIPLE_TAG,
+                        START_PREDICATE_TOKEN, VERB_TAGS)
+from .paths import find_model
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
 @dataclass
 class SRLModel:
     model: PreTrainedModel
     tokenizer: PreTrainedTokenizerBase
+
+    @classmethod
+    def from_pretrained(cls, model_path: str = None) -> "SRLModel":
+        """Load a trained SRL model and its tokenizer.
+
+        model_path: local model directory or Hugging Face Hub model ID. If None, the directory
+            in the environment variable SRL_MODEL_DIR is used.
+        """
+        return load_pretrained_srl_model(find_model(model_path))
 
     def predict_srl(self, tokens: list, pred_index: int) -> list:
         """Run SRL for one predicate"""
@@ -89,6 +96,10 @@ def load_pretrained_srl_model(model_dir: str) -> SRLModel:
 def get_predicate_indices(tokens: list, doc_offset: int = 0) -> list:
     """Return sentence-relative predicate indices from a sentence-level list of serialized token dicts.
 
+    Each token dict has the keys "pos" (universal POS tag), "tag" (STTS tag), and "dep"
+    (a dict with the dependency "tag" and, if the token has a head, the document-wide "head" index),
+    e.g. as produced from a spaCy Doc by `token_dicts_from_spacy`.
+
     doc_offset: absolute token index of the first token in this sentence within the document,
     used to correctly map document-level head indices back to sentence-relative indices.
     """
@@ -129,21 +140,9 @@ def pretty_print_srl(predicate, srl_prediction):
         print(f"{tok:20} {label}")
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser("Loads a pretrained semantic role labeling model and performs prediction on a given text.")
-    parser.add_argument('--text', help='Input text to label with semantic roles')
-    parser.add_argument('--srl_model', default=DEFAULT_SRL_MODEL_DIR, help='Path to pretrained semantic role labeling model')
-    parser.add_argument('--spacy_model', default=DEFAULT_SPACY_MODEL, help='Name of spaCy model for preprocessing text (NB: must have been pre-downloaded)')
-    args = parser.parse_args()
-
-    # Load models
-    nlp_preproc = spacy.load(args.spacy_model)
-    srl_model = load_pretrained_srl_model(args.srl_model)
-
-    # Annotate and pretty-print semantic role label predictions
-    print(f"Text: {args.text}")
-    doc = nlp_preproc(args.text)
-    token_dicts = [
+def token_dicts_from_spacy(doc) -> list[dict]:
+    """Convert a parsed spaCy Doc to the serialized token dicts expected by `get_predicate_indices`."""
+    return [
         {
             "text": t.text,
             "pos": t.pos_,
@@ -155,6 +154,29 @@ if __name__ == "__main__":
         }
         for t in doc
     ]
+
+
+def main() -> None:
+    import spacy
+
+    parser = argparse.ArgumentParser("Loads a pretrained semantic role labeling model and performs prediction on a given text.")
+    parser.add_argument('--text', required=True, help='Input text to label with semantic roles')
+    parser.add_argument('--srl_model', default=None, help='Path to pretrained semantic role labeling model (default: $SRL_MODEL_DIR)')
+    parser.add_argument('--spacy_model', default=DEFAULT_SPACY_MODEL, help='Name of spaCy model for preprocessing text (NB: must have been pre-downloaded)')
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(levelname)s: %(message)s')
+
+    # Load models
+    nlp_preproc = spacy.load(args.spacy_model)
+    srl_model = SRLModel.from_pretrained(args.srl_model)
+
+    # Annotate and pretty-print semantic role label predictions
+    print(f"Text: {args.text}")
+    token_dicts = token_dicts_from_spacy(nlp_preproc(args.text))
     token_texts = [t["text"] for t in token_dicts]
     pred_indices = get_predicate_indices(token_dicts, doc_offset=0)
     srl_model.annotate_srl(token_texts=token_texts, pred_indices=pred_indices, pretty_print=True)
+
+
+if __name__ == "__main__":
+    main()

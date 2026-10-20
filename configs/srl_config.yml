@@ -1,11 +1,13 @@
+# Training configuration for the SRL model (paths are relative to the working directory)
+
 # Base embeddings transformer model to fine-tune
 base_model: liaad/srl-en_xlmr-base
 
 # Paths to data to train and test model
 data:
-    train: ./models/srl/data/de_gsd-ud-up-train.conllup
-    validation: ./models/srl/data/de_gsd-ud-up-dev.conllup
-    test: ./models/srl/data/de_gsd-ud-up-test.conllup
+    train: ./data/de_gsd-ud-up-train.conllup
+    validation: ./data/de_gsd-ud-up-dev.conllup
+    test: ./data/de_gsd-ud-up-test.conllup
 
 # Training parameters
 train:
@@ -20,4 +22,5 @@ train:
     greater_is_better: True
 
 # Directory to save model configs, checkpoints, and final model
-model_outdir: ./models/srl/pretrained/liaad/srl-en_xlmr-base
+# Can be overridden on the command line with --output-dir
+model_outdir: ./pretrained/liaad/srl-en_xlmr-base

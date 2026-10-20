@@ -14,19 +14,38 @@ from transformers import (AutoModelForTokenClassification, AutoTokenizer,
                           Trainer, TrainingArguments)
 from transformers.utils import logging as hf_logging
 
-from constants.models import (DEFAULT_SRL_MODEL_DIR, SRL_BASE_MODEL,
-                              SRL_MODEL_DATA_DIR)
-from constants.srl import (BEGINNING_TAG, END_PREDICATE_TOKEN, INSIDE_TAG,
-                           NULL_SRL_TAG, START_PREDICATE_TOKEN)
-from utils.utils import LineBufferedWriter, load_config
+from .constants import (BEGINNING_TAG, DEFAULT_BASE_MODEL,
+                        DEFAULT_MODEL_OUTDIR, DEFAULT_TEST_DATA,
+                        DEFAULT_TRAIN_DATA, DEFAULT_VALIDATION_DATA,
+                        END_PREDICATE_TOKEN, INSIDE_TAG, NULL_SRL_TAG,
+                        START_PREDICATE_TOKEN)
 
 LOG_FORMAT = "%(asctime)s %(name)s %(levelname)s: %(message)s"
-logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 logger = logging.getLogger(__name__)
 
-DEFAULT_TRAIN_DATA = os.path.join(SRL_MODEL_DATA_DIR, "de_gsd-ud-up-train.conllup")
-DEFAULT_VALIDATION_DATA = os.path.join(SRL_MODEL_DATA_DIR, "de_gsd-ud-up-dev.conllup")
-DEFAULT_TEST_DATA = os.path.join(SRL_MODEL_DATA_DIR, "de_gsd-ud-up-test.conllup")
+DEFAULT_SRL_MODEL_DIR = DEFAULT_MODEL_OUTDIR
+SRL_BASE_MODEL = DEFAULT_BASE_MODEL
+
+
+class LineBufferedWriter:
+    def __init__(self, stream):
+        self.stream = stream
+
+    def write(self, data):
+        if not data:
+            return 0
+        written = self.stream.write(data)
+        self.stream.flush()
+        return written
+
+    def flush(self):
+        self.stream.flush()
+
+
+def load_config(config_path: str) -> dict:
+    import yaml
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f) or {}
 
 
 class SemanticRoleDataset:
@@ -405,13 +424,15 @@ class SemanticRoleLabeler:
         logger.info(f"Plotted training curves to {output_path}")
 
 
-def main(config_path: str):
-    # Load run config
-    config = load_config(config_path=config_path)
-    logger.info(f'Loaded model config from {config_path}')
+def main(config_path: str = None, output_dir: str = None):
+    # Load run config (if none is specified, defaults are used)
+    config = {}
+    if config_path:
+        config = load_config(config_path=config_path)
+        logger.info(f'Loaded model config from {config_path}')
 
     # Extract required arguments from run config or use defaults
-    model_outdir = config.get("model_outdir", DEFAULT_SRL_MODEL_DIR)
+    model_outdir = output_dir or config.get("model_outdir", DEFAULT_SRL_MODEL_DIR)
     base_model_name = config.get("base_model", SRL_BASE_MODEL)
     logger.info(f"Base model: {base_model_name}")
     train_datafile = config.get("data", {}).get("train", DEFAULT_TRAIN_DATA)
@@ -440,5 +461,7 @@ def main(config_path: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Fine-tunes a semantic role labeling model on CONLLU-formatted data with Universal Dependencies + Universal Propositions annotations.")
     parser.add_argument('--config', default=None, help='Path to config.yml file')
+    parser.add_argument('--output-dir', default=None, help='Directory to save the trained model, tokenizer, logs, and metrics to (must not exist yet); overrides `model_outdir` in the config file')
     args = parser.parse_args()
-    main(args.config)
+    logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
+    main(args.config, output_dir=args.output_dir)

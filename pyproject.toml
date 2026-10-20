@@ -1,0 +1,39 @@
+[project]
+name = "srl"
+version = "0.1.0"
+description = "Predicate-conditioned semantic role labeling (SRL) of German text with a fine-tuned transformer, trained on combined Universal Dependencies and Universal Propositions data."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "torch>=2.2",
+    "transformers>=5.0",
+]
+
+[project.optional-dependencies]
+# Command-line interface: spaCy for preprocessing text (German model must be installed separately)
+cli = [
+    "spacy>=3.5,<3.6",
+    "numpy<2.0",
+]
+# Fine-tuning new models
+train = [
+    "accelerate>=1.1",
+    "datasets>=4.0",
+    "seqeval>=1.2",
+    "matplotlib>=3.8",
+    "PyYAML>=6.0",
+]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["model: needs a trained SRL model (set SRL_MODEL_DIR)"]
