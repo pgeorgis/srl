@@ -6,7 +6,7 @@ import torch
 from transformers import (AutoModelForTokenClassification, AutoTokenizer,
                           PreTrainedModel, PreTrainedTokenizerBase)
 
-from .constants import (DEFAULT_SPACY_MODEL, END_PREDICATE_TOKEN,
+from .constants import (DEFAULT_SPACY_MODEL, END_PREDICATE_TOKEN, NULL_SRL_TAG,
                         PAST_PARTICIPLE_AUX_TAG, PAST_PARTICIPLE_TAG,
                         START_PREDICATE_TOKEN, VERB_TAGS)
 from .paths import find_model
@@ -28,7 +28,12 @@ class SRLModel:
         return load_pretrained_srl_model(find_model(model_path))
 
     def predict_srl(self, tokens: list, pred_index: int) -> list:
-        """Run SRL for one predicate"""
+        """Run SRL for one predicate.
+
+        Returns a list of (token, label) pairs with exactly one entry for each input token, in order.
+        Tokens that have no sub-word tokens in the model's input (blank tokens such as line breaks,
+        or text beyond the maximum input length) cannot be labeled by the model and get the outside label.
+        """
         model = self.model
         tokenizer = self.tokenizer
         model.eval()  # switch model to evaluation mode
@@ -47,25 +52,20 @@ class SRLModel:
         preds = torch.argmax(outputs.logits, dim=-1)[0]
         word_ids = encoding.word_ids()
 
-        results = []
-        seen_words = set()
-
+        # Label of each word, taken from its first sub-word token
+        labels = {}
         for i, word_id in enumerate(word_ids):
-            if word_id is None or word_id in seen_words:
+            if word_id is None or word_id in labels:
                 continue
+            labels[word_id] = model.config.id2label[preds[i].item()]
 
-            seen_words.add(word_id)
-
-            token = marked_tokens[word_id]
-            label = model.config.id2label[preds[i].item()]
-
-            # skip special tokens
-            if token in [START_PREDICATE_TOKEN, END_PREDICATE_TOKEN]:
-                continue
-
-            results.append((token, label))
-
-        return results
+        # The words at these positions of the marked tokens are the predicate markers, not input tokens
+        marker_positions = {pred_index, pred_index + 2}
+        return [
+            (token, labels.get(word_id, NULL_SRL_TAG))
+            for word_id, token in enumerate(marked_tokens)
+            if word_id not in marker_positions
+        ]
 
     def annotate_srl(self,
                      token_texts: list,
