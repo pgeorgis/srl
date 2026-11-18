@@ -23,6 +23,8 @@ train = [
     "seqeval>=1.2",
     "matplotlib>=3.8",
     "PyYAML>=6.0",
+    "sentencepiece>=0.2",
+    "protobuf>=4.21",
 ]
 
 [tool.uv]
