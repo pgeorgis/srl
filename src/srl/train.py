@@ -171,7 +171,7 @@ class SemanticRoleLabeler:
         # Set model output directory (default: <DEFAULT_OUTDIR_ROOT>/<base model>)
         if model_outdir is None:
             model_outdir = default_model_outdir(base_model)
-        self.outdir = self.init_outdir(model_outdir)
+        self.outdir = self.check_outdir(model_outdir)
 
         # Initialize base model and tokenizer
         self.base_model_name = base_model
@@ -199,8 +199,20 @@ class SemanticRoleLabeler:
         # Initialize model
         self.model = self.init_base_model()
 
+        # Create output directory
+        self.init_outdir(self.outdir)
+
     @staticmethod
-    def init_outdir(outdir: str):
+    def check_outdir(outdir: str) -> str:
+        """Return the absolute output directory; raise FileExistsError if it already exists."""
+        outdir = os.path.abspath(outdir)
+        if os.path.exists(outdir):
+            raise FileExistsError(f"Output directory {outdir} already exists; model would be overwritten.")
+        return outdir
+
+    @staticmethod
+    def init_outdir(outdir: str) -> str:
+        """Create the output directory; raise FileExistsError if it already exists."""
         outdir = os.path.abspath(outdir)
         try:
             os.makedirs(outdir)

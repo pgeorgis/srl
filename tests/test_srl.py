@@ -80,3 +80,45 @@ def test_training_output_dir_from_config_and_cli(tmp_path, monkeypatch):
     assert calls[-1]["base_model"] == "xlm-roberta-base"
     assert calls[-1]["model_outdir"] == str(Path(DEFAULT_OUTDIR_ROOT) / "xlm-roberta-base")
     assert calls[-1]["train_kwargs"]["outdir"] == calls[-1]["model_outdir"]
+
+
+def _import_train():
+    for module in ("datasets", "seqeval", "matplotlib", "yaml"):
+        pytest.importorskip(module)
+    from srl import train
+    return train
+
+
+def test_failed_base_model_load_leaves_no_output_dir(tmp_path, monkeypatch):
+    train = _import_train()
+
+    def fail_to_load(name, *args, **kwargs):
+        raise OSError(f"{name} is not a local folder and is not a valid model identifier")
+
+    monkeypatch.setattr(train.AutoTokenizer, "from_pretrained", fail_to_load)
+    outdir = tmp_path / "out" / "misspelled-model"
+    with pytest.raises(OSError):
+        train.SemanticRoleLabeler(
+            train_conllup="unused",
+            validation_conllup="unused",
+            test_conllup="unused",
+            model_outdir=str(outdir),
+            base_model="misspelled-model",
+        )
+    assert not outdir.exists()
+
+
+def test_existing_output_dir_fails_before_loading_base_model(tmp_path, monkeypatch):
+    train = _import_train()
+
+    def must_not_load(self):
+        raise AssertionError("base model tokenizer loaded although the output directory exists")
+
+    monkeypatch.setattr(train.SemanticRoleLabeler, "init_tokenizer", must_not_load)
+    with pytest.raises(FileExistsError):
+        train.SemanticRoleLabeler(
+            train_conllup="unused",
+            validation_conllup="unused",
+            test_conllup="unused",
+            model_outdir=str(tmp_path),
+        )
