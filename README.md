@@ -15,6 +15,7 @@ uv sync                                  # inference only
 uv sync --extra cli                      # also spaCy (with numpy<2), for the command-line interface
 uv sync --extra train                    # also the dependencies for fine-tuning new models
 ```
+NB: The `cli` and `train` extras cannot be installed together due to a conflict in `numpy` dependencies.
 
 The command-line interface additionally needs the spaCy German model, which is not on PyPI:
 ```bash
@@ -95,12 +96,12 @@ This yields one training instance per predicate with a token sequence and a BIO 
 ### Training
 - Training is performed with the [`train.py`](./src/srl/train.py) module together with an input config .yml file (e.g. [`srl_config.yml`](./configs/srl_config.yml)). Install the training dependencies (`uv sync --extra train`) and run from the repository root:
   ```bash
-  uv run python -m srl.train --config configs/srl_config.yml
+  uv run --extra train python -m srl.train --config configs/srl_config.yml
   ```
-  The output directory is set by `model_outdir` in the config file, or on the command line with `--output-dir`. Paths are relative to the working directory.
-- Tokenization uses `is_split_into_words=True` and aligns word-level BIO labels to subword tokens.
-- Loss ignores special tokens and padding (label `-100`).
-- Validation is performed during training with `seqeval` metrics.
+  The output directory is set by `model_outdir` in the config file, or on the command line with `--output-dir`. The output directory must not exist yet, so that no trained model is overwritten. Paths are relative to the working directory.
+- Tokenization uses `is_split_into_words=True` with truncation and padding to 128 sub-word tokens.
+- Loss ignores the tokenizer's special tokens and padding (label `-100`).
+- Validation is performed after each epoch with `seqeval` metrics; with the example config, the checkpoint with the best validation F1 is kept.
 
 ### Evaluation
 - Metrics: accuracy, precision, recall, F1 (`seqeval`)
@@ -117,7 +118,7 @@ Three base models were fine-tuned and tested on the German SRL datasets (test se
 | dbmdz/bert-base-german-cased   | 0.8730   | 0.7078    | 0.7644  | 0.7350   |
 | liaad/srl-en_xlmr-base   | **0.8749** | **0.7345** | **0.7724** | **0.7530** |
 
-`liaad/srl-en_xlmr-base` performed the best in all test metrics and is the default model.
+`liaad/srl-en_xlmr-base` performed the best in all test metrics and is the default base model.
 
 ### Outputs
 - `train.log`: full training and evaluation logs
@@ -130,7 +131,7 @@ Trained models can annotate the semantic roles of arguments in novel input sente
 
 Example usage:
 ```python
-from srl import SRLModel, get_predicate_indices
+from srl import SRLModel
 
 model = SRLModel.from_pretrained("/path/to/model")  # or set $SRL_MODEL_DIR
 tokens = ["Der", "Hund", "jagt", "die", "Katze", "."]
@@ -149,10 +150,10 @@ Katze                I-A1
 ```
 
 
-Example usage of the command-line interface (requires `uv sync --extra cli`, the spaCy model `de_core_news_lg`, and a trained model, see [above](#trained-model)):
+Example usage of the command-line interface (requires `uv sync --extra cli`, the spaCy model `de_core_news_lg`, and a trained model, see [above](#trained-model)). Options: `--srl_model` (model directory or Hub ID; default `$SRL_MODEL_DIR`) and `--spacy_model` (default `de_core_news_lg`).
 
 ```
-python -m srl --text "Die Kirche, die die Dorfbewohner während des Krieges als Zufluchtsort benutzten, wurde von Mönchen im 14. Jahrhundert erbaut."
+uv run --extra cli python -m srl --text "Die Kirche, die die Dorfbewohner während des Krieges als Zufluchtsort benutzten, wurde von Mönchen im 14. Jahrhundert erbaut."
 
 Text: Die Kirche, die die Dorfbewohner während des Krieges als Zufluchtsort benutzten, wurde von Mönchen im 14. Jahrhundert erbaut.
 
@@ -218,11 +219,11 @@ combined = combine_postproc_srls(srls)  # {token index: [{"pred_idx", "predicate
 
 ## Repository structure
 * [`src/srl/`](./src/srl/)
-    * [`predict.py`](./src/srl/predict.py): `SRLModel` (prediction), `get_predicate_indices`, command-line interface.
+    * [`predict.py`](./src/srl/predict.py): `SRLModel` and command-line interface.
     * [`postprocess.py`](./src/srl/postprocess.py): `postproc_srl` and `combine_postproc_srls` (BIO labels to argument spans).
     * [`train.py`](./src/srl/train.py): fine-tuning on `.conllup` data.
     * [`paths.py`](./src/srl/paths.py), [`constants.py`](./src/srl/constants.py): locating the trained model, special tokens, BIO tags, and defaults.
 * [`configs/srl_config.yml`](./configs/srl_config.yml): example training configuration.
 * [`data/`](./data/): combined UD+UP training, validation, and test data.
 * [`results/`](./results/): configs and evaluation metrics of the trained models (without the weights).
-* [`tests/`](./tests/)
+* [`tests/`](./tests/): `pytest` test suite.
