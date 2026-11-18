@@ -225,4 +225,4 @@ combined = combine_postproc_srls(srls)  # {token index: [{"pred_idx", "predicate
 * [`configs/srl_config.yml`](./configs/srl_config.yml): example training configuration.
 * [`data/`](./data/): combined UD+UP training, validation, and test data.
 * [`results/`](./results/): configs and evaluation metrics of the trained models (without the weights).
-
+* [`tests/`](./tests/)

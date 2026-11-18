@@ -9,6 +9,17 @@ BEGINNING_TAG = "B"
 INSIDE_TAG = "I"
 NULL_SRL_TAG = "O"  # O = outside any argument
 
+# Core semantic arguments and labels
+CORE_ARGS = ["A0", "A1", "A2"]
+CORE_SR_LABELS = [
+    NULL_SRL_TAG,
+    f"{BEGINNING_TAG}-V",
+] + [
+    f"{BEGINNING_TAG}-{core_srl}" for core_srl in CORE_ARGS
+] + [
+    f"{INSIDE_TAG}-{core_srl}" for core_srl in CORE_ARGS
+]
+
 # Universal POS tags of verbs, and STTS tags of participles, used to identify predicates
 VERB_TAGS = {
     "VERB",
