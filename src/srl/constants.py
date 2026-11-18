@@ -38,7 +38,8 @@ DEFAULT_SPACY_MODEL = "de_core_news_lg"
 DEFAULT_TRAIN_DATA = "data/de_gsd-ud-up-train.conllup"
 DEFAULT_VALIDATION_DATA = "data/de_gsd-ud-up-dev.conllup"
 DEFAULT_TEST_DATA = "data/de_gsd-ud-up-test.conllup"
-DEFAULT_MODEL_OUTDIR = "pretrained/liaad/srl-en_xlmr-base"
+# Parent directory of trained models if no output directory is given: <DEFAULT_OUTDIR_ROOT>/<base model>
+DEFAULT_OUTDIR_ROOT = "out"
 
 # Environment variable that may point to the directory of a trained SRL model
 MODEL_DIR_ENV_VAR = "SRL_MODEL_DIR"

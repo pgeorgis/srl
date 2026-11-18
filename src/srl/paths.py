@@ -2,7 +2,7 @@
 import os
 from pathlib import Path
 
-from .constants import MODEL_DIR_ENV_VAR
+from .constants import DEFAULT_OUTDIR_ROOT, MODEL_DIR_ENV_VAR
 
 
 def find_model(model_path: str | os.PathLike = None) -> str:
@@ -25,3 +25,15 @@ def find_model(model_path: str | os.PathLike = None) -> str:
         "No trained SRL model specified. Pass `model_path` (a local directory or Hugging Face model ID) "
         f"or set the environment variable {MODEL_DIR_ENV_VAR} to the directory of a trained model."
     )
+
+
+def default_model_outdir(base_model: str | os.PathLike, root: str | os.PathLike = DEFAULT_OUTDIR_ROOT) -> str:
+    """Return the default output directory for a model fine-tuned from `base_model`: <root>/<base model>.
+
+    A Hugging Face Hub model ID keeps its namespace as a sub-directory
+    (e.g. "model-family/my-specific-model" -> "out/model-family/my-specific-model");
+    a local base model directory contributes only its own name (e.g. "/home/Documents/models/my-xlmr/" -> "out/my-xlmr").
+    """
+    base_model_path = Path(base_model).expanduser()
+    name = base_model_path.resolve().name if base_model_path.exists() else str(base_model).strip("/")
+    return str(Path(root) / name)

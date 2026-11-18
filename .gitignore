@@ -6,5 +6,6 @@ __pycache__/
 
 # Trained SRL models and checkpoints
 pretrained/
+out/
 **/checkpoint*
 **/train.log

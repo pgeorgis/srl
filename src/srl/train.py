@@ -14,16 +14,15 @@ from transformers import (AutoModelForTokenClassification, AutoTokenizer,
                           Trainer, TrainingArguments)
 from transformers.utils import logging as hf_logging
 
-from .constants import (BEGINNING_TAG, DEFAULT_BASE_MODEL,
-                        DEFAULT_MODEL_OUTDIR, DEFAULT_TEST_DATA,
+from .constants import (BEGINNING_TAG, DEFAULT_BASE_MODEL, DEFAULT_TEST_DATA,
                         DEFAULT_TRAIN_DATA, DEFAULT_VALIDATION_DATA,
                         END_PREDICATE_TOKEN, INSIDE_TAG, NULL_SRL_TAG,
                         START_PREDICATE_TOKEN)
+from .paths import default_model_outdir
 
 LOG_FORMAT = "%(asctime)s %(name)s %(levelname)s: %(message)s"
 logger = logging.getLogger(__name__)
 
-DEFAULT_SRL_MODEL_DIR = DEFAULT_MODEL_OUTDIR
 SRL_BASE_MODEL = DEFAULT_BASE_MODEL
 
 
@@ -166,10 +165,12 @@ class SemanticRoleLabeler:
                  train_conllup: str,
                  validation_conllup: str,
                  test_conllup: str,
-                 model_outdir: str = DEFAULT_SRL_MODEL_DIR,
+                 model_outdir: str = None,
                  base_model: str = SRL_BASE_MODEL,
                  ):
-        # Set model output directory
+        # Set model output directory (default: <DEFAULT_OUTDIR_ROOT>/<base model>)
+        if model_outdir is None:
+            model_outdir = default_model_outdir(base_model)
         self.outdir = self.init_outdir(model_outdir)
 
         # Initialize base model and tokenizer
@@ -432,9 +433,10 @@ def main(config_path: str = None, output_dir: str = None):
         logger.info(f'Loaded model config from {config_path}')
 
     # Extract required arguments from run config or use defaults
-    model_outdir = output_dir or config.get("model_outdir", DEFAULT_SRL_MODEL_DIR)
     base_model_name = config.get("base_model", SRL_BASE_MODEL)
     logger.info(f"Base model: {base_model_name}")
+    model_outdir = output_dir or config.get("model_outdir") or default_model_outdir(base_model_name)
+    logger.info(f"Output directory: {model_outdir}")
     train_datafile = config.get("data", {}).get("train", DEFAULT_TRAIN_DATA)
     validation_datafile = config.get("data", {}).get("validation", DEFAULT_VALIDATION_DATA)
     test_datafile = config.get("data", {}).get("test", DEFAULT_TEST_DATA)
@@ -461,7 +463,7 @@ def main(config_path: str = None, output_dir: str = None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Fine-tunes a semantic role labeling model on CONLLU-formatted data with Universal Dependencies + Universal Propositions annotations.")
     parser.add_argument('--config', default=None, help='Path to config.yml file')
-    parser.add_argument('--output-dir', default=None, help='Directory to save the trained model, tokenizer, logs, and metrics to (must not exist yet); overrides `model_outdir` in the config file')
+    parser.add_argument('--output-dir', default=None, help='Directory to save the trained model, tokenizer, logs, and metrics to (must not exist yet); overrides `model_outdir` in the config file (default: out/<base model>)')
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
     main(args.config, output_dir=args.output_dir)

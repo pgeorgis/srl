@@ -1,11 +1,13 @@
 import os
+from pathlib import Path
 
 import pytest
 
 from srl import (BEGINNING_TAG, END_PREDICATE_TOKEN, NULL_SRL_TAG,
                  START_PREDICATE_TOKEN, SRLModel, get_predicate_indices,
                  mark_predicate, remove_bio_prefix)
-from srl.constants import MODEL_DIR_ENV_VAR
+from srl.constants import (DEFAULT_BASE_MODEL, DEFAULT_OUTDIR_ROOT,
+                           MODEL_DIR_ENV_VAR)
 from tests import GOLD_EXAMPLES, serialize_token
 
 
@@ -70,5 +72,11 @@ def test_training_output_dir_from_config_and_cli(tmp_path, monkeypatch):
     train.main(str(config), output_dir="cli/override")  # command line overrides config
     assert calls[-1]["model_outdir"] == "cli/override"
 
-    train.main()  # no config: defaults
-    assert calls[-1]["model_outdir"] == train.DEFAULT_SRL_MODEL_DIR
+    train.main()  # no config: output directory follows the default base model
+    assert calls[-1]["model_outdir"] == str(Path(DEFAULT_OUTDIR_ROOT) / DEFAULT_BASE_MODEL)
+
+    config.write_text("base_model: xlm-roberta-base\n")  # config without output directory
+    train.main(str(config))
+    assert calls[-1]["base_model"] == "xlm-roberta-base"
+    assert calls[-1]["model_outdir"] == str(Path(DEFAULT_OUTDIR_ROOT) / "xlm-roberta-base")
+    assert calls[-1]["train_kwargs"]["outdir"] == calls[-1]["model_outdir"]
