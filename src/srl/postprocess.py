@@ -2,9 +2,30 @@
 import re
 from collections import defaultdict
 from functools import lru_cache
+from typing import TypedDict
 
 from .constants import BEGINNING_TAG, INSIDE_TAG, NULL_SRL_TAG
 from .predict import SRLModel, get_predicate_indices
+
+
+class SRLArgument(TypedDict):
+    """An argument span of a predicate."""
+    span: list[int]  # [first token index, last token index] (inclusive), document-wide
+    text: str        # token texts of the span, joined by spaces
+    label: str       # semantic role without BIO prefix, e.g. "A0", "AM-TMP"
+
+
+class PredicateSRL(TypedDict):
+    """Predicted arguments of one predicate."""
+    text: str                 # token text of the predicate
+    args: list[SRLArgument]   # arguments in token order
+
+
+class CombinedSRL(TypedDict):
+    """Semantic role of a token with respect to one predicate."""
+    pred_idx: int    # document-wide token index of the predicate
+    predicate: str   # token text of the predicate
+    srl: str         # semantic role, e.g. "A0"
 
 
 @lru_cache
@@ -19,12 +40,17 @@ def remove_bio_prefix(label: str) -> str:
 def postproc_srl(tokens: list[dict],
                  sentences: dict,
                  srl_model: SRLModel,
-                 ) -> dict[int, list[dict]]:
-    """Returns a nested dictionary of token indices with their predicted semantic role labels per predicate.
+                 ) -> dict[int, PredicateSRL]:
+    """Predict the argument spans of each predicate in a document.
 
     tokens: serialized token dicts for the whole document (keys "text", "pos", "tag", and "dep", see
         `get_predicate_indices`, e.g. from `token_dicts_from_spacy`), indexed document-wide.
-    sentences: dict mapping sentence index to [start_token, end_token] absolute indices.
+    sentences: dict mapping sentence index to [first token index, end token index] (end exclusive) document-wide.
+
+    Returns a dict mapping the document-wide token index of each predicate (selected by `get_predicate_indices`)
+    to its text and its argument spans, e.g.
+    {2: {"text": "jagt", "args": [{"span": [0, 1], "text": "Der Hund", "label": "A0"}, ...]}}.
+    The predicate itself and tokens labeled "O" belong to no argument span.
     """
     srls = {}
     for sent_i in sorted(sentences.keys(), key=int):
@@ -89,8 +115,15 @@ def postproc_srl(tokens: list[dict],
     return srls
 
 
-def combine_postproc_srls(srls: dict, remove_label_prefix: bool = True) -> dict:
-    """Returns a dictionary of token indices with their predicted semantic role labels combined over all relevant predicates in a text."""
+def combine_postproc_srls(srls: dict[int, PredicateSRL],
+                          remove_label_prefix: bool = True,
+                          ) -> defaultdict[int, list[CombinedSRL]]:
+    """Combine the output of `postproc_srl` per token, over all predicates.
+
+    Returns a dict mapping each token index that belongs to an argument span of at least one predicate
+    to its semantic role per predicate, e.g. {0: [{"pred_idx": 2, "predicate": "jagt", "srl": "A0"}], ...}.
+    Tokens that are part of no argument span are left out.
+    """
     srls_combined = defaultdict(lambda: [])
     for pred_idx, pred_data in srls.items():
         pred_text = pred_data["text"]

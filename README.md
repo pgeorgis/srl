@@ -210,9 +210,10 @@ The model outputs a BIO label per token for each predicate. [`postprocess.py`](.
 from srl import SRLModel, postproc_srl, combine_postproc_srls
 
 # tokens: token dicts for the whole document (keys "text", "pos", "tag", "dep"), e.g. from token_dicts_from_spacy(doc)
-# sentences: {sentence index: [first token index, end token index]}
+# sentences: {sentence index: [first token index, end token index (exclusive)]}
 srls = postproc_srl(tokens, sentences, SRLModel.from_pretrained())
 # {predicate token index: {"text": "jagt", "args": [{"span": [0, 1], "text": "Der Hund", "label": "A0"}, ...]}}
+# "span": [first token index, last token index] (inclusive)
 
 combined = combine_postproc_srls(srls)  # {token index: [{"pred_idx", "predicate", "srl"}, ...]} over all predicates
 ```
