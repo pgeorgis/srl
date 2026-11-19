@@ -110,11 +110,11 @@ Three base models were fine-tuned and tested on the German SRL datasets (test se
 
 | Model                     | Accuracy | Precision | Recall  | F1 Score |
 |--------------------------|----------|-----------|---------|----------|
-| xlm-roberta-base         | 0.8674   | 0.7172    | 0.7653  | 0.7405   |
-| dbmdz/bert-base-german-cased   | 0.8730   | 0.7078    | 0.7644  | 0.7350   |
-| liaad/srl-en_xlmr-base   | **0.8749** | **0.7345** | **0.7724** | **0.7530** |
+| xlm-roberta-base         | 0.8651   | 0.6022    | 0.6837  | 0.6404   |
+| dbmdz/bert-base-german-cased   | 0.8691   | 0.6040    | 0.6723  | 0.6363   |
+| liaad/srl-en_xlmr-base   | **0.8705** | **0.6192** | **0.6903** | **0.6528** |
 
-`liaad/srl-en_xlmr-base` performs best in precision, recall, and F1, and is the default base model.
+`liaad/srl-en_xlmr-base` performs best in accuracy, precision, recall, and F1, and is the default base model.
 
 ### Outputs
 - `train.log`: full training and evaluation logs
