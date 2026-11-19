@@ -9,7 +9,8 @@ dependencies = [
     "transformers>=5.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
+dev = ["pytest>=8"]
 # Command-line interface: spaCy and its German model for preprocessing text
 cli = [
     "spacy>=3.8,<3.9",
@@ -26,8 +27,8 @@ train = [
     "protobuf>=4.21",
 ]
 
-[dependency-groups]
-dev = ["pytest>=8"]
+[tool.uv]
+default-groups = ["dev", "cli", "train"]
 
 [build-system]
 requires = ["setuptools>=68"]

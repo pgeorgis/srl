@@ -129,12 +129,12 @@ def test_existing_output_dir_fails_before_loading_base_model(tmp_path, monkeypat
 
 def test_load_spacy_model_without_spacy_exits_with_instructions(monkeypatch):
     monkeypatch.setitem(sys.modules, "spacy", None)  # makes `import spacy` raise ImportError
-    with pytest.raises(SystemExit, match="spaCy is not installed.*uv run --extra cli"):
+    with pytest.raises(SystemExit, match="spaCy is not installed.*uv sync"):
         load_spacy_model()
 
 
 @pytest.mark.parametrize("name, message", [
-    pytest.param(DEFAULT_SPACY_MODEL, f"model {DEFAULT_SPACY_MODEL} is not installed.*uv sync --extra cli", id="default_model"),
+    pytest.param(DEFAULT_SPACY_MODEL, f"model {DEFAULT_SPACY_MODEL} is not installed.*uv sync", id="default_model"),
     pytest.param("my_model", "model my_model could not be loaded: .*E050", id="other_model"),
 ])
 def test_load_spacy_model_missing_model_exits_with_instructions(monkeypatch, name, message):

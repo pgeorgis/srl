@@ -158,8 +158,8 @@ def token_dicts_from_spacy(doc) -> list[dict]:
 def load_spacy_model(name: str = DEFAULT_SPACY_MODEL):
     """Load the spaCy model used by the command line, exiting with instructions if spaCy or the model is missing."""
     CLI_RUN_HINT = (
-        "Install the command-line dependencies (spaCy and its German model) with `uv sync --extra cli`, "
-        "or run the command line with `uv run --extra cli python -m srl ...`."
+        "Install the command-line dependencies (spaCy and its German model) "
+        "by syncing this repository's environment with `uv sync`."
     )
     try:
         import spacy
@@ -177,7 +177,7 @@ def main() -> None:
     parser = argparse.ArgumentParser("Loads a pretrained semantic role labeling model and performs prediction on a given text.")
     parser.add_argument('--text', required=True, help='Input text to label with semantic roles')
     parser.add_argument('--srl_model', default=None, help='Path to pretrained semantic role labeling model (default: $SRL_MODEL_DIR)')
-    parser.add_argument('--spacy_model', default=DEFAULT_SPACY_MODEL, help=f'Name or path of the spaCy model for preprocessing text (default: {DEFAULT_SPACY_MODEL}, installed with the cli extra)')
+    parser.add_argument('--spacy_model', default=DEFAULT_SPACY_MODEL, help=f'Name or path of the spaCy model for preprocessing text (default: {DEFAULT_SPACY_MODEL})')
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(levelname)s: %(message)s')
 

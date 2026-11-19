@@ -11,10 +11,8 @@ This library requires Python 3.11 or later and is best managed with [uv](https:/
 
 As a development environment:
 ```bash
-uv sync                                  # inference only
-uv sync --extra cli                      # also spaCy and its German model, for the command-line interface
-uv sync --extra train                    # also the dependencies for fine-tuning new models
-uv sync --all-extras
+uv sync                                  # everything: inference, command-line interface, training, tests
+uv sync --no-default-groups              # inference only
 ```
 
 ### Trained model
@@ -88,9 +86,9 @@ This yields one training instance per predicate with a token sequence and a BIO 
 - Special tokens are added to the tokenizer and embedding matrix is resized
 
 ### Training
-- Training is performed with the [`train.py`](./src/srl/train.py) module together with an input config .yml file (e.g. [`srl_config.yml`](./configs/srl_config.yml)). Install the training dependencies (`uv sync --extra train`) and run from the repository root:
+- Training is performed with the [`train.py`](./src/srl/train.py) module together with an input config .yml file (e.g. [`srl_config.yml`](./configs/srl_config.yml)). Run from the repository root:
   ```bash
-  uv run --extra train python -m srl.train --config configs/srl_config.yml
+  uv run python -m srl.train --config configs/srl_config.yml
   ```
   The output directory is set by `model_outdir` in the config file, or on the command line with `--output-dir`. Otherwise, it defaults to `out/<base model>`. The output directory must not exist yet, so that no trained model is overwritten. Paths are relative to the working directory.
 - Tokenization uses `is_split_into_words=True`. Each batch is padded to its longest example. Examples are only truncated at the tokenizer's maximum input length.
@@ -144,10 +142,10 @@ Katze                I-A1
 ```
 
 
-Example usage of the command-line interface (requires `uv sync --extra cli` and a trained model, see [above](#trained-model)). Options: `--srl_model` (model directory or Hub ID; default `$SRL_MODEL_DIR`) and `--spacy_model` (default `de_core_news_lg`).
+Example usage of the command-line interface (requires a trained model, see [above](#trained-model)). Options: `--srl_model` (model directory or Hub ID; default `$SRL_MODEL_DIR`) and `--spacy_model` (default `de_core_news_lg`).
 
 ```
-uv run --extra cli python -m srl --text "Die Kirche, die die Dorfbewohner während des Krieges als Zufluchtsort benutzten, wurde von Mönchen im 14. Jahrhundert erbaut."
+uv run python -m srl --text "Die Kirche, die die Dorfbewohner während des Krieges als Zufluchtsort benutzten, wurde von Mönchen im 14. Jahrhundert erbaut."
 
 Text: Die Kirche, die die Dorfbewohner während des Krieges als Zufluchtsort benutzten, wurde von Mönchen im 14. Jahrhundert erbaut.
 
