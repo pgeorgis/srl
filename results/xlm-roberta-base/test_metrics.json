@@ -1,11 +1,11 @@
 {
-    "test_loss": 0.4035484790802002,
-    "test_accuracy": 0.8674017855083163,
-    "test_precision": 0.7171761925860286,
-    "test_recall": 0.7653270291568164,
-    "test_f1": 0.7404696553827387,
-    "test_runtime": 5.7512,
-    "test_samples_per_second": 235.255,
-    "test_steps_per_second": 29.559,
+    "test_loss": 0.41294991970062256,
+    "test_accuracy": 0.8650839397651128,
+    "test_precision": 0.6022416621104428,
+    "test_recall": 0.6837368094351335,
+    "test_f1": 0.640406976744186,
+    "test_runtime": 3.3175,
+    "test_samples_per_second": 407.842,
+    "test_steps_per_second": 51.244,
     "epoch": 3.0
 }
