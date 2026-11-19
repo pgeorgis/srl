@@ -25,8 +25,15 @@ VERB_TAGS = {
     "VERB",
     "AUX",
 }
-PAST_PARTICIPLE_TAG = "VVPP"      # past participle, e.g. <hat ... gesehen>
-PAST_PARTICIPLE_AUX_TAG = "VAPP"  # auxiliary past participle, e.g. <ist ... gewesen>
+# STTS tags of non-finite verbs whose (auxiliary or modal) head is not a predicate of its own
+NONFINITE_VERB_TAGS = {
+    "VVPP",             # past participle, e.g. <hat ... gesehen>
+    "VAPP",             # auxiliary past participle, e.g. <ist ... gewesen>
+    "VMPP",             # modal past participle, e.g. <hat ... gekonnt>
+    "VVINF",            # full infinitive, e.g. <würde ... sehen>
+    "VAINF",            # auxiliary infinitive, e.g. <muss ... haben>, <kann ... sein>, <wird ... werden>
+    "VMINF",            # modal infinitive, e.g. <hätte ... sehen können>
+}
 
 # Base model (HuggingFace Hub ID) fine-tuned for German SRL
 DEFAULT_BASE_MODEL = "liaad/srl-en_xlmr-base"

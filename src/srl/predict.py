@@ -6,8 +6,8 @@ import torch
 from transformers import (AutoModelForTokenClassification, AutoTokenizer,
                           PreTrainedModel, PreTrainedTokenizerBase)
 
-from .constants import (DEFAULT_SPACY_MODEL, END_PREDICATE_TOKEN, NULL_SRL_TAG,
-                        PAST_PARTICIPLE_AUX_TAG, PAST_PARTICIPLE_TAG,
+from .constants import (DEFAULT_SPACY_MODEL, END_PREDICATE_TOKEN,
+                        NONFINITE_VERB_TAGS, NULL_SRL_TAG,
                         START_PREDICATE_TOKEN, VERB_TAGS)
 from .paths import find_model
 
@@ -102,19 +102,18 @@ def get_predicate_indices(tokens: list, doc_offset: int = 0) -> list:
 
     doc_offset: absolute token index of the first token in this sentence within the document,
     used to correctly map document-level head indices back to sentence-relative indices.
+
+    Every verb or auxiliary (universal POS tag VERB or AUX) is considered a predicate, except the head
+    of a non-finite verb (a participle or infinitive) to avoid conditioning on modal verbs:
+    e.g. in <er hat das Buch gelesen> only <gelesen> is considered a predicate, and in <muss das Buch haben> only <haben>.
+    Copulas and auxiliaries without a non-finite dependent remain predicates.
     """
     verbs_and_aux = [idx for idx, tok in enumerate(tokens) if tok["pos"] in VERB_TAGS]
     predicate_idx = []
     heads_to_skip = set()
     for idx in verbs_and_aux:
         token = tokens[idx]
-        if token.get("tag") in {
-            PAST_PARTICIPLE_TAG,     # (VVPP) past participle, e.g. <hat ... gesehen>
-            PAST_PARTICIPLE_AUX_TAG, # (VAPP) auxiliary past participle, e.g. <ist ... gewesen>
-            'VMPP',                  # modal past participle, e.g. <hat ... gekonnt>
-            'VVINF',                 # full infinitive, e.g. <würde ... sehen> 
-            'VMINF',                 # modal infinitive, e.g. <hätte ... sehen können>
-        } and "head" in token.get("dep", {}):
+        if token.get("tag") in NONFINITE_VERB_TAGS and "head" in token.get("dep", {}):
             head_sent_idx = token["dep"]["head"] - doc_offset
             if 0 <= head_sent_idx < len(tokens):
                 heads_to_skip.add(head_sent_idx)

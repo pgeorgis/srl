@@ -4,7 +4,8 @@ from types import SimpleNamespace
 import torch
 
 from srl import SRLModel, mark_predicate
-from srl.constants import BEGINNING_TAG, CORE_SR_LABELS, NULL_SRL_TAG
+from srl.constants import (BEGINNING_TAG, CORE_SR_LABELS, END_PREDICATE_TOKEN,
+                           NULL_SRL_TAG, START_PREDICATE_TOKEN)
 
 
 def serialize_token(text: str, pos: str, tag: str, head=None, dep="X") -> dict:
@@ -120,6 +121,23 @@ GOLD_EXAMPLES = {
             {"span": [2, 2], "text": "Maria", "label": "A1"},
         ]},
     ),
+    "er_muss_buch_haben": GoldExample(
+        # modal with an auxiliary infinitive (VAINF): only the infinitive <haben> is a predicate, not <muss>
+        text="Er muss das Buch haben",
+        tokens=[
+            serialize_token("Er", "PRON", "PPER", 1),
+            serialize_token("muss", "AUX", "VMFIN", dep="ROOT"),
+            serialize_token("das", "DET", "ART", 3),
+            serialize_token("Buch", "NOUN", "NN", 4),
+            serialize_token("haben", "AUX", "VAINF", 1),
+        ],
+        srl={4: ["B-A0", "B-AM-MOD", "B-A1", "I-A1", "B-V"]},
+        args={4: [
+            {"span": [0, 0], "text": "Er", "label": "A0"},
+            {"span": [1, 1], "text": "muss", "label": "AM-MOD"},
+            {"span": [2, 3], "text": "das Buch", "label": "A1"},
+        ]},
+    ),
 }
 
 
@@ -170,18 +188,21 @@ class FakeModel:
     def __init__(self, marked_labels, tokenizer):
         self.marked_labels = marked_labels
         self.tokenizer = tokenizer
-        self.config = SimpleNamespace(id2label=dict(enumerate(CORE_SR_LABELS)))
+        # core labels, plus any other labels to predict (e.g. B-AM-MOD), but not the predicate markers
+        markers = {START_PREDICATE_TOKEN, END_PREDICATE_TOKEN}
+        self.label_set = list(dict.fromkeys(CORE_SR_LABELS + [l for l in marked_labels if l not in markers]))
+        self.config = SimpleNamespace(id2label=dict(enumerate(self.label_set)))
 
     def eval(self):
         pass
 
     def __call__(self, input_ids, **kwargs):
-        logits = torch.zeros(1, input_ids.shape[1], len(CORE_SR_LABELS))
+        logits = torch.zeros(1, input_ids.shape[1], len(self.label_set))
         for position, word_id in enumerate(self.tokenizer.word_ids):
             label = NULL_SRL_TAG if word_id is None else self.marked_labels[word_id]
-            if label not in CORE_SR_LABELS:  # predicate markers
+            if label not in self.label_set:  # predicate markers
                 label = NULL_SRL_TAG
-            logits[0, position, CORE_SR_LABELS.index(label)] = 1.0
+            logits[0, position, self.label_set.index(label)] = 1.0
         return SimpleNamespace(logits=logits)
 
 
