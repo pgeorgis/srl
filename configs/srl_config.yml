@@ -9,6 +9,10 @@ data:
     validation: ./data/de_gsd-ud-up-dev.conllup
     test: ./data/de_gsd-ud-up-test.conllup
 
+# Label every sub-word token of the training examples with its word's label (true)
+# or only the first sub-word token of each word (false, default)
+label_all_subwords: false
+
 # Training parameters
 train:
     num_train_epochs: 3

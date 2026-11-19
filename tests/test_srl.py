@@ -70,6 +70,7 @@ def test_training_output_dir_from_config_and_cli(tmp_path, monkeypatch):
 
     train.main(str(config))
     assert calls[-1]["model_outdir"] == "./out/from_config"
+    assert calls[-1]["label_all_subwords"] is False  # default: training examples labeled per word
     assert calls[-1]["train_kwargs"]["outdir"] == "./out/from_config"
 
     train.main(str(config), output_dir="cli/override")  # command line overrides config
@@ -77,6 +78,10 @@ def test_training_output_dir_from_config_and_cli(tmp_path, monkeypatch):
 
     train.main()  # no config: output directory follows the default base model
     assert calls[-1]["model_outdir"] == str(Path(DEFAULT_OUTDIR_ROOT) / DEFAULT_BASE_MODEL)
+
+    config.write_text("label_all_subwords: true\n")
+    train.main(str(config))
+    assert calls[-1]["label_all_subwords"] is True
 
     config.write_text("base_model: xlm-roberta-base\n")  # config without output directory
     train.main(str(config))

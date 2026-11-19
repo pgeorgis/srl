@@ -167,6 +167,7 @@ class SemanticRoleLabeler:
                  test_conllup: str,
                  model_outdir: str = None,
                  base_model: str = SRL_BASE_MODEL,
+                 label_all_subwords: bool = False,
                  ):
         # Set model output directory (default: <DEFAULT_OUTDIR_ROOT>/<base model>)
         if model_outdir is None:
@@ -192,7 +193,11 @@ class SemanticRoleLabeler:
 
         # Preprocess SemanticRoleDatasets: tokenization and alignment
         logger.info("Tokenizing data...")
-        self.train_set = self.preprocess_dataset(train_set)
+        # Training examples are labeled per word (first sub-word token only)
+        # unless label_all_subwords=True
+        self.label_all_subwords = label_all_subwords
+        logger.info(f"Training labels: {'all sub-word tokens' if label_all_subwords else 'first sub-word token of each word'}")
+        self.train_set = self.preprocess_dataset(train_set, label_all_subwords=label_all_subwords)
         self.validation_set = self.preprocess_dataset(validation_set, label_all_subwords=False)
         self.test_set = self.preprocess_dataset(test_set, label_all_subwords=False)
 
@@ -261,7 +266,7 @@ class SemanticRoleLabeler:
         self.labels.update(dataset.labels)
         return dataset
 
-    def preprocess_dataset(self, dataset: SemanticRoleDataset, label_all_subwords: bool = True) -> Dataset:
+    def preprocess_dataset(self, dataset: SemanticRoleDataset, label_all_subwords: bool = False) -> Dataset:
         filepath = dataset.filepath
         dataset = Dataset.from_list(dataset.examples)
         dataset = dataset.map(
@@ -276,12 +281,12 @@ class SemanticRoleLabeler:
             )
         return dataset.remove_columns("truncated")
 
-    def tokenize_and_align(self, example, label_all_subwords: bool = True):
+    def tokenize_and_align(self, example, label_all_subwords: bool = False):
         """Tokenize a (predicate-marked) example and align its word labels to the sub-word tokens.
 
-        label_all_subwords: if True, every sub-word token gets the label of its word (including the predicate
-            markers, labeled "O"). If False, only the first sub-word token of each word is labeled, and the other
-            sub-word tokens and the predicate markers get -100, so that loss and metrics are per word.
+        label_all_subwords: if False (default), only the first sub-word token of each word is labeled, and the
+            other sub-word tokens and the predicate markers get -100, so that loss and metrics are per word.
+            If True, every sub-word token gets the label of its word (including the predicate markers, labeled "O").
 
         The example is not padded: batches are padded to their longest example by the data collator
         (see `train`). Examples are only truncated at the tokenizer's maximum input length.
@@ -482,6 +487,7 @@ def main(config_path: str = None, output_dir: str = None):
     logger.info(f"Training data: {train_datafile}")
     logger.info(f"Validation data: {validation_datafile}")
     logger.info(f"Test data: {test_datafile}")
+    label_all_subwords = bool(config.get("label_all_subwords", False))
     training_parameters = config.get("train", {})
     if training_parameters:
         logger.info(f"Loaded training parameters: {json.dumps(training_parameters, indent=4)}")
@@ -493,6 +499,7 @@ def main(config_path: str = None, output_dir: str = None):
         test_conllup=test_datafile,
         base_model=base_model_name,
         model_outdir=model_outdir,
+        label_all_subwords=label_all_subwords,
     )
 
     # Train model

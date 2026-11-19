@@ -92,7 +92,7 @@ This yields one training instance per predicate with a token sequence and a BIO 
   ```
   The output directory is set by `model_outdir` in the config file, or on the command line with `--output-dir`. Otherwise, it defaults to `out/<base model>`. The output directory must not exist yet, so that no trained model is overwritten. Paths are relative to the working directory.
 - Tokenization uses `is_split_into_words=True`. Each batch is padded to its longest example. Examples are only truncated at the tokenizer's maximum input length.
-- Loss ignores the tokenizer's special tokens and padding (label `-100`).
+- Only the first sub-word token of each word is labeled and considered for evaluating model loss. Any subsequent sub-word tokens of a word, the predicate markers, the tokenizer's special tokens, and padding are labeled as `-100` and are ignored by the loss.
 - Validation is performed after each epoch with `seqeval` metrics; with the example config, the checkpoint with the best validation F1 is kept.
 
 ### Evaluation
