@@ -11,7 +11,8 @@ from datasets import Dataset
 from seqeval.metrics import (accuracy_score, f1_score, precision_score,
                              recall_score)
 from transformers import (AutoModelForTokenClassification, AutoTokenizer,
-                          Trainer, TrainingArguments)
+                          DataCollatorForTokenClassification, Trainer,
+                          TrainingArguments)
 from transformers.utils import logging as hf_logging
 
 from .constants import (BEGINNING_TAG, DEFAULT_BASE_MODEL, DEFAULT_TEST_DATA,
@@ -262,20 +263,30 @@ class SemanticRoleLabeler:
         return dataset
 
     def preprocess_dataset(self, dataset: SemanticRoleDataset) -> Dataset:
+        filepath = dataset.filepath
         dataset = Dataset.from_list(dataset.examples)
         dataset = dataset.map(
             lambda x: self.tokenize_and_align(x),
             batched=False
         )
-        return dataset
-    
+        n_truncated = sum(dataset["truncated"])
+        if n_truncated:
+            logger.warning(
+                f"{n_truncated} of {len(dataset)} examples in {filepath} exceed the maximum input length "
+                f"of {self.tokenizer.model_max_length} sub-word tokens and were truncated"
+            )
+        return dataset.remove_columns("truncated")
+
     def tokenize_and_align(self, example):
+        """Tokenize a (predicate-marked) example and give each sub-word token the label of its word.
+
+        The example is not padded: batches are padded to their longest example by the data collator
+        (see `train`). Examples are only truncated at the tokenizer's maximum input length.
+        """
         encoding = self.tokenizer(
             example["tokens"],
             is_split_into_words=True,
             truncation=True,
-            padding="max_length",
-            max_length=128
         )
         word_ids = encoding.word_ids()
 
@@ -287,6 +298,13 @@ class SemanticRoleLabeler:
                 labels.append(self.label2id[example["labels"][word_id]])
 
         encoding["labels"] = labels
+
+        # Truncated if the last non-blank word (blank words have no sub-word tokens) is not in the encoding
+        nonblank_word_ids = [i for i, token in enumerate(example["tokens"]) if token.strip()]
+        encoded_word_ids = [word_id for word_id in word_ids if word_id is not None]
+        encoding["truncated"] = bool(nonblank_word_ids) and (
+            not encoded_word_ids or max(encoded_word_ids) < nonblank_word_ids[-1]
+        )
         return encoding
 
     def get_label_maps(self) -> tuple[dict, dict]:
@@ -311,17 +329,7 @@ class SemanticRoleLabeler:
             outdir = self.outdir
         kwargs["disable_tqdm"] = not sys.stderr.isatty()
         training_log = self.configure_logging(outdir)
-        training_args = TrainingArguments(
-            output_dir=outdir,
-            **kwargs
-        )
-        trainer = Trainer(
-            model=self.model,
-            args=training_args,
-            train_dataset=self.train_set,
-            eval_dataset=self.validation_set,
-            compute_metrics=self.compute_metrics,
-        )
+        trainer = self.init_trainer(outdir, **kwargs)
         with open(training_log, "a", encoding="utf-8", buffering=1) as logf, \
                 contextlib.redirect_stdout(LineBufferedWriter(logf)), \
                 contextlib.redirect_stderr(LineBufferedWriter(logf)):
@@ -340,6 +348,22 @@ class SemanticRoleLabeler:
         trainer.save_model(outdir)
         self.tokenizer.save_pretrained(outdir)
         logger.info(f"Model saved to {outdir}")
+
+    def init_trainer(self, outdir: str, **kwargs) -> Trainer:
+        """Initialize the Hugging Face Trainer; kwargs are passed on to TrainingArguments."""
+        training_args = TrainingArguments(
+            output_dir=outdir,
+            **kwargs
+        )
+        return Trainer(
+            model=self.model,
+            args=training_args,
+            train_dataset=self.train_set,
+            eval_dataset=self.validation_set,
+            # Pad each batch to its longest example
+            data_collator=DataCollatorForTokenClassification(tokenizer=self.tokenizer),
+            compute_metrics=self.compute_metrics,
+        )
 
     def compute_metrics(self, eval_pred) -> dict[str, float]:
         predictions, labels = eval_pred
