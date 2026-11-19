@@ -96,8 +96,8 @@ This yields one training instance per predicate with a token sequence and a BIO 
 - Validation is performed after each epoch with `seqeval` metrics; with the example config, the checkpoint with the best validation F1 is kept.
 
 ### Evaluation
-- Metrics: accuracy, precision, recall, F1 (`seqeval`)
-- Test metrics are saved to `test_metrics.json` within the model output directory
+- Metrics: accuracy, precision, recall, F1: each argument span is scored by the label of its first sub-word token. The predicate itself (`B-V`) is not counted as an argument, since it is marked in the input.
+- Test metrics are saved to `test_metrics.json` within the model output directory.
 
 Three base models were fine-tuned and tested on the German SRL datasets (test set; the metrics and configs of each are saved under [`results/`](./results/)):
 - [`xlm-roberta-base`](https://huggingface.co/FacebookAI/xlm-roberta-base): multilingual model (100 languages) pre-trained on 2.5TB of filtered CommonCrawl data.
@@ -110,7 +110,7 @@ Three base models were fine-tuned and tested on the German SRL datasets (test se
 | dbmdz/bert-base-german-cased   | 0.8730   | 0.7078    | 0.7644  | 0.7350   |
 | liaad/srl-en_xlmr-base   | **0.8749** | **0.7345** | **0.7724** | **0.7530** |
 
-`liaad/srl-en_xlmr-base` performed the best in all test metrics and is the default base model.
+`liaad/srl-en_xlmr-base` performs best in precision, recall, and F1, and is the default base model.
 
 ### Outputs
 - `train.log`: full training and evaluation logs

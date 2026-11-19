@@ -8,8 +8,6 @@ import warnings
 
 import matplotlib.pyplot as plt
 from datasets import Dataset
-from seqeval.metrics import (accuracy_score, f1_score, precision_score,
-                             recall_score)
 from transformers import (AutoModelForTokenClassification, AutoTokenizer,
                           DataCollatorForTokenClassification, Trainer,
                           TrainingArguments)
@@ -19,6 +17,7 @@ from .constants import (BEGINNING_TAG, DEFAULT_BASE_MODEL, DEFAULT_TEST_DATA,
                         DEFAULT_TRAIN_DATA, DEFAULT_VALIDATION_DATA,
                         END_PREDICATE_TOKEN, INSIDE_TAG, NULL_SRL_TAG,
                         START_PREDICATE_TOKEN)
+from .metrics import srl_metrics
 from .paths import default_model_outdir
 
 LOG_FORMAT = "%(asctime)s %(name)s %(levelname)s: %(message)s"
@@ -194,8 +193,8 @@ class SemanticRoleLabeler:
         # Preprocess SemanticRoleDatasets: tokenization and alignment
         logger.info("Tokenizing data...")
         self.train_set = self.preprocess_dataset(train_set)
-        self.validation_set = self.preprocess_dataset(validation_set)
-        self.test_set = self.preprocess_dataset(test_set)
+        self.validation_set = self.preprocess_dataset(validation_set, label_all_subwords=False)
+        self.test_set = self.preprocess_dataset(test_set, label_all_subwords=False)
 
         # Initialize model
         self.model = self.init_base_model()
@@ -262,11 +261,11 @@ class SemanticRoleLabeler:
         self.labels.update(dataset.labels)
         return dataset
 
-    def preprocess_dataset(self, dataset: SemanticRoleDataset) -> Dataset:
+    def preprocess_dataset(self, dataset: SemanticRoleDataset, label_all_subwords: bool = True) -> Dataset:
         filepath = dataset.filepath
         dataset = Dataset.from_list(dataset.examples)
         dataset = dataset.map(
-            lambda x: self.tokenize_and_align(x),
+            lambda x: self.tokenize_and_align(x, label_all_subwords=label_all_subwords),
             batched=False
         )
         n_truncated = sum(dataset["truncated"])
@@ -277,8 +276,12 @@ class SemanticRoleLabeler:
             )
         return dataset.remove_columns("truncated")
 
-    def tokenize_and_align(self, example):
-        """Tokenize a (predicate-marked) example and give each sub-word token the label of its word.
+    def tokenize_and_align(self, example, label_all_subwords: bool = True):
+        """Tokenize a (predicate-marked) example and align its word labels to the sub-word tokens.
+
+        label_all_subwords: if True, every sub-word token gets the label of its word (including the predicate
+            markers, labeled "O"). If False, only the first sub-word token of each word is labeled, and the other
+            sub-word tokens and the predicate markers get -100, so that loss and metrics are per word.
 
         The example is not padded: batches are padded to their longest example by the data collator
         (see `train`). Examples are only truncated at the tokenizer's maximum input length.
@@ -290,12 +293,17 @@ class SemanticRoleLabeler:
         )
         word_ids = encoding.word_ids()
 
+        markers = {START_PREDICATE_TOKEN, END_PREDICATE_TOKEN}
         labels = []
+        previous_word_id = None
         for word_id in word_ids:
             if word_id is None:
                 labels.append(-100)
+            elif not label_all_subwords and (word_id == previous_word_id or example["tokens"][word_id] in markers):
+                labels.append(-100)
             else:
                 labels.append(self.label2id[example["labels"][word_id]])
+            previous_word_id = word_id
 
         encoding["labels"] = labels
 
@@ -382,12 +390,7 @@ class SemanticRoleLabeler:
             true_labels.append(seq_labels)
             true_preds.append(seq_preds)
 
-        return {
-            "accuracy": accuracy_score(true_labels, true_preds),
-            "precision": precision_score(true_labels, true_preds),
-            "recall": recall_score(true_labels, true_preds),
-            "f1": f1_score(true_labels, true_preds),
-        }
+        return srl_metrics(true_labels, true_preds)
 
     def log_metrics(self, metrics: dict, outdir: str):
         logfile = os.path.join(outdir, "test_metrics.json")
