@@ -10,14 +10,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Command-line interface: spaCy for preprocessing text (German model must be installed separately)
+# Command-line interface: spaCy and its German model for preprocessing text
 cli = [
-    "spacy>=3.5,<3.6",
-    "numpy<2.0",
+    "spacy>=3.8,<3.9",
+    "de-core-news-lg @ https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.8.0/de_core_news_lg-3.8.0-py3-none-any.whl",
 ]
 # Fine-tuning new models
 train = [
-    "numpy>=2.0",  # pyarrow (via datasets) needs NumPy 2, whereas the cli extra needs numpy<2
     "accelerate>=1.1",
     "datasets>=4.0",
     "seqeval>=1.2",
@@ -26,10 +25,6 @@ train = [
     "sentencepiece>=0.2",
     "protobuf>=4.21",
 ]
-
-[tool.uv]
-# The CLI's spaCy 3.5 needs numpy<2, whereas the training dependencies (pyarrow) need numpy>=2
-conflicts = [[{ extra = "cli" }, { extra = "train" }]]
 
 [dependency-groups]
 dev = ["pytest>=8"]

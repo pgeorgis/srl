@@ -155,18 +155,34 @@ def token_dicts_from_spacy(doc) -> list[dict]:
     ]
 
 
-def main() -> None:
-    import spacy
+def load_spacy_model(name: str = DEFAULT_SPACY_MODEL):
+    """Load the spaCy model used by the command line, exiting with instructions if spaCy or the model is missing."""
+    CLI_RUN_HINT = (
+        "Install the command-line dependencies (spaCy and its German model) with `uv sync --extra cli`, "
+        "or run the command line with `uv run --extra cli python -m srl ...`."
+    )
+    try:
+        import spacy
+    except ImportError as exc:
+        raise SystemExit(f"spaCy is not installed. {CLI_RUN_HINT}") from exc
+    try:
+        return spacy.load(name)
+    except OSError as exc:
+        if name == DEFAULT_SPACY_MODEL:
+            raise SystemExit(f"spaCy model {name} is not installed. {CLI_RUN_HINT}") from exc
+        raise SystemExit(f"spaCy model {name} could not be loaded: {exc}") from exc
 
+
+def main() -> None:
     parser = argparse.ArgumentParser("Loads a pretrained semantic role labeling model and performs prediction on a given text.")
     parser.add_argument('--text', required=True, help='Input text to label with semantic roles')
     parser.add_argument('--srl_model', default=None, help='Path to pretrained semantic role labeling model (default: $SRL_MODEL_DIR)')
-    parser.add_argument('--spacy_model', default=DEFAULT_SPACY_MODEL, help='Name of spaCy model for preprocessing text (NB: must have been pre-downloaded)')
+    parser.add_argument('--spacy_model', default=DEFAULT_SPACY_MODEL, help=f'Name or path of the spaCy model for preprocessing text (default: {DEFAULT_SPACY_MODEL}, installed with the cli extra)')
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(levelname)s: %(message)s')
 
     # Load models
-    nlp_preproc = spacy.load(args.spacy_model)
+    nlp_preproc = load_spacy_model(args.spacy_model)
     srl_model = SRLModel.from_pretrained(args.srl_model)
 
     # Annotate and pretty-print semantic role label predictions

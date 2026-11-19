@@ -12,16 +12,10 @@ This library requires Python 3.11 or later and is best managed with [uv](https:/
 As a development environment:
 ```bash
 uv sync                                  # inference only
-uv sync --extra cli                      # also spaCy (with numpy<2), for the command-line interface
+uv sync --extra cli                      # also spaCy and its German model, for the command-line interface
 uv sync --extra train                    # also the dependencies for fine-tuning new models
+uv sync --all-extras
 ```
-NB: The `cli` and `train` extras cannot be installed together due to a conflict in `numpy` dependencies.
-
-The command-line interface additionally needs the spaCy German model, which is not on PyPI:
-```bash
-uv pip install https://github.com/explosion/spacy-models/releases/download/de_core_news_lg-3.5.0/de_core_news_lg-3.5.0.tar.gz
-```
-(`uv sync` removes packages that are not in the lock file, so re-run this after syncing, or sync with `uv sync --inexact`.)
 
 ### Trained model
 **No trained model is included in this repository** (the weights are too large). Obtain a trained model directory (containing `config.json`, `model.safetensors`, `tokenizer.json`, ...) and either pass its path (or a Hugging Face Hub model ID) to `SRLModel.from_pretrained(model_path)`, or set the environment variable `SRL_MODEL_DIR` to its location, e.g.:
@@ -150,7 +144,7 @@ Katze                I-A1
 ```
 
 
-Example usage of the command-line interface (requires `uv sync --extra cli`, the spaCy model `de_core_news_lg`, and a trained model, see [above](#trained-model)). Options: `--srl_model` (model directory or Hub ID; default `$SRL_MODEL_DIR`) and `--spacy_model` (default `de_core_news_lg`).
+Example usage of the command-line interface (requires `uv sync --extra cli` and a trained model, see [above](#trained-model)). Options: `--srl_model` (model directory or Hub ID; default `$SRL_MODEL_DIR`) and `--spacy_model` (default `de_core_news_lg`).
 
 ```
 uv run --extra cli python -m srl --text "Die Kirche, die die Dorfbewohner während des Krieges als Zufluchtsort benutzten, wurde von Mönchen im 14. Jahrhundert erbaut."

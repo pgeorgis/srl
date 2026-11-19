@@ -1,5 +1,7 @@
 import os
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -7,7 +9,8 @@ from srl import (BEGINNING_TAG, END_PREDICATE_TOKEN, NULL_SRL_TAG,
                  START_PREDICATE_TOKEN, SRLModel, get_predicate_indices,
                  mark_predicate, remove_bio_prefix)
 from srl.constants import (DEFAULT_BASE_MODEL, DEFAULT_OUTDIR_ROOT,
-                           MODEL_DIR_ENV_VAR)
+                           DEFAULT_SPACY_MODEL, MODEL_DIR_ENV_VAR)
+from srl.predict import load_spacy_model
 from tests import GOLD_EXAMPLES, serialize_token
 
 
@@ -122,3 +125,22 @@ def test_existing_output_dir_fails_before_loading_base_model(tmp_path, monkeypat
             test_conllup="unused",
             model_outdir=str(tmp_path),
         )
+
+
+def test_load_spacy_model_without_spacy_exits_with_instructions(monkeypatch):
+    monkeypatch.setitem(sys.modules, "spacy", None)  # makes `import spacy` raise ImportError
+    with pytest.raises(SystemExit, match="spaCy is not installed.*uv run --extra cli"):
+        load_spacy_model()
+
+
+@pytest.mark.parametrize("name, message", [
+    pytest.param(DEFAULT_SPACY_MODEL, f"model {DEFAULT_SPACY_MODEL} is not installed.*uv sync --extra cli", id="default_model"),
+    pytest.param("my_model", "model my_model could not be loaded: .*E050", id="other_model"),
+])
+def test_load_spacy_model_missing_model_exits_with_instructions(monkeypatch, name, message):
+    def load(model_name):
+        raise OSError(f"[E050] Can't find model '{model_name}'.")
+
+    monkeypatch.setitem(sys.modules, "spacy", SimpleNamespace(load=load))
+    with pytest.raises(SystemExit, match=message):
+        load_spacy_model(name)
