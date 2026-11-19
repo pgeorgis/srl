@@ -98,6 +98,10 @@ This yields one training instance per predicate with a token sequence and a BIO 
 ### Evaluation
 - Metrics: accuracy, precision, recall, F1: each argument span is scored by the label of its first sub-word token. The predicate itself (`B-V`) is not counted as an argument, since it is marked in the input.
 - Test metrics are saved to `test_metrics.json` within the model output directory.
+- A trained model can also be evaluated on its own, with metrics per role:
+  ```bash
+  uv run python -m srl.evaluate --model /path/to/model --data data/de_gsd-ud-up-test.conllup
+  ```
 
 Three base models were fine-tuned and tested on the German SRL datasets (test set; the metrics and configs of each are saved under [`results/`](./results/)):
 - [`xlm-roberta-base`](https://huggingface.co/FacebookAI/xlm-roberta-base): multilingual model (100 languages) pre-trained on 2.5TB of filtered CommonCrawl data.
@@ -215,6 +219,7 @@ combined = combine_postproc_srls(srls)  # {token index: [{"pred_idx", "predicate
     * [`predict.py`](./src/srl/predict.py): `SRLModel` and command-line interface.
     * [`postprocess.py`](./src/srl/postprocess.py): `postproc_srl` and `combine_postproc_srls` (BIO labels to argument spans).
     * [`train.py`](./src/srl/train.py): fine-tuning on `.conllup` data.
+    * [`evaluate.py`](./src/srl/evaluate.py), [`metrics.py`](./src/srl/metrics.py): evaluation of a pre-trained model.
     * [`paths.py`](./src/srl/paths.py), [`constants.py`](./src/srl/constants.py): locating the trained model, special tokens, BIO tags, and defaults.
 * [`configs/srl_config.yml`](./configs/srl_config.yml): example training configuration.
 * [`data/`](./data/): combined UD+UP training, validation, and test data.
