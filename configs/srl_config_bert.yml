@@ -1,0 +1,26 @@
+# Training configuration for the SRL model (paths are relative to the working directory)
+
+# Base embeddings transformer model to fine-tune
+base_model: bert-base-german-cased
+
+# Paths to data to train and test model
+data:
+    train: ./data/de_gsd-ud-up-train.conllup
+    validation: ./data/de_gsd-ud-up-dev.conllup
+    test: ./data/de_gsd-ud-up-test.conllup
+
+# Label every sub-word token of the training examples with its word's label (true)
+# or only the first sub-word token of each word (false, default)
+label_all_subwords: false
+
+# Training parameters
+train:
+    num_train_epochs: 3
+    eval_strategy: epoch
+    save_strategy: epoch
+    logging_steps: 50
+    save_total_limit: 2
+    # Early stopping
+    load_best_model_at_end: True
+    metric_for_best_model: eval_f1
+    greater_is_better: True
