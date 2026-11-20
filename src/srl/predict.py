@@ -6,8 +6,8 @@ import torch
 from transformers import (AutoModelForTokenClassification, AutoTokenizer,
                           PreTrainedModel, PreTrainedTokenizerBase)
 
-from .constants import (DEFAULT_SPACY_MODEL, END_PREDICATE_TOKEN,
-                        NONFINITE_VERB_TAGS, NULL_SRL_TAG,
+from .constants import (AUXILIARY_TAG, DEFAULT_SPACY_MODEL,
+                        END_PREDICATE_TOKEN, NONFINITE_VERB_TAGS, NULL_SRL_TAG,
                         START_PREDICATE_TOKEN, VERB_TAGS)
 from .paths import find_model
 
@@ -103,10 +103,11 @@ def get_predicate_indices(tokens: list, doc_offset: int = 0) -> list:
     doc_offset: absolute token index of the first token in this sentence within the document,
     used to correctly map document-level head indices back to sentence-relative indices.
 
-    Every verb or auxiliary (universal POS tag VERB or AUX) is considered a predicate, except the head
-    of a non-finite verb (a participle or infinitive) to avoid conditioning on modal verbs:
+    Every verb or auxiliary (universal POS tag VERB or AUX) is considered a predicate, except an auxiliary
+    or modal verb (AUX) heading a non-finite verb (a participle or infinitive), to avoid conditioning on it:
     e.g. in <er hat das Buch gelesen> only <gelesen> is considered a predicate, and in <muss das Buch haben> only <haben>.
-    Copulas and auxiliaries without a non-finite dependent remain predicates.
+    Lexical verbs heading a non-finite verb remain predicates, e.g. both <behauptet> and <sein> in
+    <sie behauptet, krank zu sein>, as do copulas and auxiliaries without a non-finite dependent.
     """
     verbs_and_aux = [idx for idx, tok in enumerate(tokens) if tok["pos"] in VERB_TAGS]
     predicate_idx = []
@@ -115,7 +116,7 @@ def get_predicate_indices(tokens: list, doc_offset: int = 0) -> list:
         token = tokens[idx]
         if token.get("tag") in NONFINITE_VERB_TAGS and "head" in token.get("dep", {}):
             head_sent_idx = token["dep"]["head"] - doc_offset
-            if 0 <= head_sent_idx < len(tokens):
+            if 0 <= head_sent_idx < len(tokens) and tokens[head_sent_idx]["pos"] == AUXILIARY_TAG:
                 heads_to_skip.add(head_sent_idx)
         predicate_idx.append(idx)
     return [idx for idx in predicate_idx if idx not in heads_to_skip]

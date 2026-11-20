@@ -21,11 +21,12 @@ CORE_SR_LABELS = [
 ]
 
 # Universal POS tags of verbs, and STTS tags of participles, used to identify predicates
+AUXILIARY_TAG = "AUX"  # auxiliary and modal verbs
 VERB_TAGS = {
     "VERB",
-    "AUX",
+    AUXILIARY_TAG,
 }
-# STTS tags of non-finite verbs whose (auxiliary or modal) head is not a predicate of its own
+# STTS tags of non-finite verbs whose auxiliary or modal head (but not a lexical verb head) is not a predicate of its own
 NONFINITE_VERB_TAGS = {
     "VVPP",             # past participle, e.g. <hat ... gesehen>
     "VAPP",             # auxiliary past participle, e.g. <ist ... gewesen>

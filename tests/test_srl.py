@@ -34,6 +34,75 @@ def test_predicate_indices_respects_document_offset():
     assert get_predicate_indices(tokens, doc_offset=10) == [1]
 
 
+@pytest.mark.parametrize("tokens, expected", [
+    pytest.param(
+        # zu-infinitive of an auxiliary (VAINF) under a lexical verb: both are predicates
+        [
+            serialize_token("Sie", "PRON", "PPER", 1),
+            serialize_token("behauptet", "VERB", "VVFIN", dep="ROOT"),
+            serialize_token(",", "PUNCT", "$,", 1),
+            serialize_token("krank", "ADV", "ADJD", 5),
+            serialize_token("zu", "PART", "PTKZU", 5),
+            serialize_token("sein", "AUX", "VAINF", 1),
+        ],
+        [1, 5],
+        id="behauptet_krank_zu_sein",
+    ),
+    pytest.param(
+        # zu-infinitive of a full verb (VVINF) under a lexical verb: both are predicates
+        [
+            serialize_token("Sie", "PRON", "PPER", 1),
+            serialize_token("versucht", "VERB", "VVFIN", dep="ROOT"),
+            serialize_token(",", "PUNCT", "$,", 1),
+            serialize_token("das", "DET", "ART", 4),
+            serialize_token("Buch", "NOUN", "NN", 6),
+            serialize_token("zu", "PART", "PTKZU", 6),
+            serialize_token("lesen", "VERB", "VVINF", 1),
+        ],
+        [1, 6],
+        id="versucht_buch_zu_lesen",
+    ),
+    pytest.param(
+        # passive under a modal: neither the modal <muss> nor the passive auxiliary <werden> is a predicate
+        [
+            serialize_token("Das", "DET", "ART", 1),
+            serialize_token("Auto", "NOUN", "NN", 2),
+            serialize_token("muss", "AUX", "VMFIN", dep="ROOT"),
+            serialize_token("repariert", "VERB", "VVPP", 4),
+            serialize_token("werden", "AUX", "VAINF", 2),
+        ],
+        [3],
+        id="muss_repariert_werden",
+    ),
+    pytest.param(
+        # future perfect: only the participle is a predicate
+        [
+            serialize_token("Er", "PRON", "PPER", 1),
+            serialize_token("wird", "AUX", "VAFIN", dep="ROOT"),
+            serialize_token("das", "DET", "ART", 3),
+            serialize_token("Buch", "NOUN", "NN", 4),
+            serialize_token("gelesen", "VERB", "VVPP", 5),
+            serialize_token("haben", "AUX", "VAINF", 1),
+        ],
+        [4],
+        id="wird_gelesen_haben",
+    ),
+    pytest.param(
+        # copula under a modal: the copula <sein> remains a predicate, the modal <kann> does not
+        [
+            serialize_token("Sie", "PRON", "PPER", 1),
+            serialize_token("kann", "AUX", "VMFIN", dep="ROOT"),
+            serialize_token("krank", "ADV", "ADJD", 3),
+            serialize_token("sein", "AUX", "VAINF", 1),
+        ],
+        [3],
+        id="kann_krank_sein",
+    ),
+])
+def test_predicate_indices_skip_only_auxiliary_heads(tokens, expected):
+    assert get_predicate_indices(tokens) == expected
+
+
 @pytest.mark.model
 @pytest.mark.skipif(not os.environ.get(MODEL_DIR_ENV_VAR), reason=f"{MODEL_DIR_ENV_VAR} not set")
 def test_annotate_srl_with_trained_model():
