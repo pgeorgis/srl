@@ -9,3 +9,5 @@ pretrained/
 out/
 **/checkpoint*
 **/train.log
+**/model.safetensors
+**/tokenizer.json
